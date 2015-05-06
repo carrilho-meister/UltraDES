@@ -4,5 +4,9 @@
     {
         public abstract AbstractState S1 { get; protected set; }
         public abstract AbstractState S2 { get; protected set; }
+
+        public abstract override string ToString();
+        public abstract override int GetHashCode();
+        public abstract override bool Equals(object obj);
     }
 }

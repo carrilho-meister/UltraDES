@@ -464,7 +464,6 @@ namespace UltraDES
                 .GroupBy(t => t.Item2)
                 .ToDictionary(g => g.Key, g => g.Select(t => t.Item1).ToArray());
 
-
             var frontier = new ConcurrentDictionary<int, bool>();
             frontier.TryAdd(initial, true);
             visited[initial] = true;
