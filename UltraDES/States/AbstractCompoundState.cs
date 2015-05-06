@@ -1,5 +1,8 @@
-﻿namespace UltraDES
+﻿using System;
+
+namespace UltraDES
 {
+    [Serializable]
     public abstract class AbstractCompoundState:AbstractState
     {
         public abstract AbstractState S1 { get; protected set; }
