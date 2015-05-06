@@ -1,6 +1,8 @@
 # UltraDES
 UltraDES is a library for modeling, analysis and control of Discrete Event Systems. It has been developed at LACSED | UFMG (http://www.lacsed.eng.ufmg.br).
 
+![UltraDES](http://www.lacsed.eng.ufmg.br/~lucasvra/wp-content/uploads/2015/01/Logo-UltraDES.png)
+
 ## Creating States
 
 ```cs
