@@ -228,15 +228,17 @@ namespace Test
                 },
                 s[0], "E4");
 
+            // Solving Confict
+
+
             var timer = new Stopwatch();
             timer.Start();
-            var sup = DeterministicFiniteAutomaton.MonoliticSupervisor(
+            var supred = DeterministicFiniteAutomaton.LocalModularReducedSupervisor(
                 new[] {c1, c2, milling, lathe, robot, mm, c3, mp},
-                new[] {e1, e2, e3, e4, e5, e6, e7, e8}, true);
+                new[] {e1, e2, e3, e4, e5, e6, e7, e8});
             timer.Stop();
 
             Console.WriteLine("Computation Time: {0}", timer.ElapsedMilliseconds/1000.0);
-            Console.WriteLine("States: {0}\nTransitions: {1}", sup.States.Count(), sup.Transitions.Count());
             
             Console.ReadLine();
 

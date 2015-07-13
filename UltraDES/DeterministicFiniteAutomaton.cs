@@ -5,15 +5,19 @@ using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Linq;
-using Some = UltraDES.Some<UltraDES.AbstractState>;
-using None = UltraDES.None<UltraDES.AbstractState>;
 
 namespace UltraDES
 {
+    using Some = Some<AbstractState>;
+    using None = None<AbstractState>;
+    using DesablingStructure =  Dictionary<AbstractState, ISet<AbstractEvent>>;
+
     [Serializable]
     public sealed class DeterministicFiniteAutomaton
     {
@@ -898,6 +902,248 @@ namespace UltraDES
             }
 
             return complete;
+        }
+
+        public static IEnumerable<Tuple<DeterministicFiniteAutomaton, DesablingStructure>> LocalModularReducedSupervisor(
+            IEnumerable<DeterministicFiniteAutomaton> plants,
+            IEnumerable<DeterministicFiniteAutomaton> specifications,
+            IEnumerable<Tuple<IEnumerable<DeterministicFiniteAutomaton>,
+            IEnumerable<DeterministicFiniteAutomaton>>> conflictResolvingSupervisor = null)
+        {
+            if (conflictResolvingSupervisor == null)
+                conflictResolvingSupervisor = new List<Tuple<IEnumerable<DeterministicFiniteAutomaton>,
+                    IEnumerable<DeterministicFiniteAutomaton>>>();
+
+            var dic = specifications.ToDictionary(e => plants.Where(p => p._events.Intersect(e._events).Any()).ToArray());
+
+            var supervisors =
+                dic.AsParallel()
+                    .AsOrdered()
+                    .WithExecutionMode(ParallelExecutionMode.ForceParallelism)
+                    .Select(automata => MonoliticSupervisor(automata.Key, new[] { automata.Value }))
+                    .ToList();
+
+            var pp = dic.Select(m=>m.Key.Aggregate((a, b) => a.ParallelCompositionWith(b)).CoaccessiblePart).ToList();
+            pp.AddRange(conflictResolvingSupervisor.Select(crs => crs.Item1.Aggregate((a, b) => a.ParallelCompositionWith(b)).CoaccessiblePart));
+            var ee = dic.Select(m => m.Value).ToList();
+            ee.AddRange(conflictResolvingSupervisor.Select(crs => crs.Item2.Aggregate((a, b) => a.ParallelCompositionWith(b)).CoaccessiblePart));
+            var ss = supervisors.ToList();
+            ss.AddRange(conflictResolvingSupervisor.Select(crs=>MonoliticSupervisor(crs.Item1,crs.Item2)));
+
+            
+
+            //if (IsConflicting(ss))
+            //{
+            //    throw new Exception("conflicting supervisors");
+            //}
+
+            return pp.Select((t, i) => ReduceSupervisor(t, ss[i],ee[i]._events)).ToList();
+        }
+
+        public static Tuple<DeterministicFiniteAutomaton, DesablingStructure>
+            ReduceSupervisor(DeterministicFiniteAutomaton plant, DeterministicFiniteAutomaton supervisor, IEnumerable<AbstractEvent> events)
+        {
+            var states = supervisor._states;
+
+            var E = new Dictionary<AbstractState, IEnumerable<AbstractEvent>>();
+            var D = new Dictionary<AbstractState, IEnumerable<AbstractEvent>>();
+
+            foreach (var s in supervisor.States.OfType<AbstractCompoundState>())
+            {
+                E.Add(s, supervisor.Transitions.Where(t => t.Origin == s).Select(t => t.Trigger).Distinct().ToArray());
+                D.Add(s,
+                    plant.Transitions.Where(t => t.Origin == s.S1)
+                        .Select(t => t.Trigger)
+                        .Distinct()
+                        .Except(supervisor.Transitions.Where(t => t.Origin == s).Select(t => t.Trigger).Distinct())
+                        .ToArray());
+            }
+
+            var R = new Dictionary<Tuple<AbstractState, AbstractState>, List<Tuple<AbstractState, AbstractState>>>();
+
+            for (int i = 0; i < states.Length - 1; i++)
+            {
+                for (int j = i + 1; j < states.Length; j++)
+                {
+                    var x1 = states[i];
+                    var x2 = states[j];
+                    bool c1 = !E[x1].Intersect(D[x2]).Any() && !E[x2].Intersect(D[x1]).Any();
+
+                    if (!c1)
+                    {
+                        R.Add(Tuple.Create(x1, x2), null);
+                        continue;
+                    }
+
+                    var shared = E[x1].Intersect(E[x2]).ToArray();
+
+                    R.Add(Tuple.Create(x1, x2), new List<Tuple<AbstractState, AbstractState>>());
+
+                    if (!shared.Any()) continue;
+
+                    foreach (var e in shared)
+                    {
+                        var d1 = supervisor.TransitionFunction(x1, e).Value;
+                        var d2 = supervisor.TransitionFunction(x2, e).Value;
+
+                        if (d1 == d2)
+                        {
+                            R[Tuple.Create(x1, x2)] = null;
+                            continue;
+                        }
+
+                        R[Tuple.Create(x1, x2)].Add(Tuple.Create(d1, d2));
+                    }
+                }
+            }
+
+            bool change = true;
+
+            while (change)
+            {
+                change = false;
+
+                foreach (var kvp in new Dictionary<Tuple<AbstractState, AbstractState>, List<Tuple<AbstractState, AbstractState>>>(R))
+                {
+                    if (kvp.Value == null || !kvp.Value.Any()) continue;
+
+                    var count = 0;
+                    foreach (var xy in kvp.Value)
+                    {
+                        if (R.ContainsKey(xy))
+                        {
+                            if (R[xy] == null)
+                            {
+                                R[kvp.Key] = null;
+                                change = true;
+                                break;
+                            }
+                            if (R[xy].Count == 0)
+                                count++;
+                        }
+                        else
+                        {
+                            var yx = Tuple.Create(xy.Item2, xy.Item1);
+
+                            if (R[yx] == null)
+                            {
+                                R[kvp.Key] = null;
+                                change = true;
+                                break;
+                            }
+                            if (R[yx].Count == 0)
+                                count++;
+                        }
+                    }
+                    if (count != kvp.Value.Count) continue;
+
+                    change = true;
+                    R[kvp.Key] = new List<Tuple<AbstractState, AbstractState>>();
+                }
+            }
+
+            foreach (var kvp in R.ToList())
+            {
+                if ((kvp.Value != null && kvp.Value.Any()) || kvp.Value == null)
+                    R.Remove(kvp.Key);
+            }
+
+            var C = new List<HashSet<HashSet<AbstractState>>>
+            {
+                new HashSet<HashSet<AbstractState>>(states.Select(x => new HashSet<AbstractState> {x}))
+            };
+
+            bool flag = false;
+            var n = 1;
+
+            while (!flag)
+            {
+                flag = true;
+                foreach (var Ci in C[n-1])
+                {
+                    foreach (var x1 in states)
+                    {
+                        if (!Ci.All(x2 =>
+                            (R.ContainsKey(Tuple.Create(x1, x2)) && !R[Tuple.Create(x1, x2)].Any()) ||
+                            (R.ContainsKey(Tuple.Create(x2, x1)) && !R[Tuple.Create(x2, x1)].Any())
+                            )) continue;
+
+
+                        if(C.Count<n+1) C.Add(new HashSet<HashSet<AbstractState>>());
+
+                        var aux = new HashSet<AbstractState>(Ci) {x1};
+
+                        if (!C[n].Any(Cj => Cj.SetEquals(aux)))
+                        {
+                            C[n].Add(aux);
+                            flag = false;
+                        }
+                    }
+                }
+
+                n++;
+            }
+
+
+            var CC = C.SelectMany(c => c).ToList();
+            var Cn = new HashSet<HashSet<AbstractState>>();
+            var tot = new HashSet<AbstractState>();
+
+            while (tot.Count != states.Length)
+            {
+                var chosen = CC.Aggregate((a, b) => a.Except(tot).Count() >= b.Except(tot).Count() ? a : b);
+                Cn.Add(chosen);
+                tot.UnionWith(chosen);
+            }
+
+            var opt = new List<HashSet<HashSet<AbstractState>>>();
+
+
+            var st = Cn.ToDictionary(o => o, o => o.Aggregate((a, b) => a.MergeWith(b).ToMarked));
+
+            var transitions = new List<Transition>();
+
+            var disabled = Cn.SelectMany(X => X.Aggregate(new AbstractEvent[0], (a, b) => a.Union(D[b]).ToArray())).Distinct().ToList();
+
+            foreach (var X in Cn)
+            {
+                var ev = X.Aggregate(new List<AbstractEvent>(), (a, b) => a.Union(E[b]).ToList());
+
+                foreach (var e in ev.Intersect(events.Union(disabled)))
+                {
+
+                    var dest =
+                        X.SelectMany(
+                            x =>
+                                supervisor.Transitions.Where(t => t.Origin == x && t.Trigger == e)
+                                    .Select(t => t.Destination))
+                            .Distinct()
+                            .ToList();
+
+                    var X2 = Cn.SingleOrDefault(X1 => dest.TrueForAll(X1.Contains));
+
+                    transitions.Add(new Transition(st[X], e, st[X2]));
+                }
+            }
+
+            var initial = st[Cn.First(X => X.Contains(supervisor.InitialState))];
+
+            var supred = new DeterministicFiniteAutomaton(transitions, initial,
+                String.Format("SupRed({0})", supervisor._name)).Trim;
+
+            var disabling = Cn.ToDictionary(X => st[X],
+               X => new HashSet<AbstractEvent>(X.Aggregate(new AbstractEvent[0], (a, b) => a.Union(D[b]).ToArray())) as ISet<AbstractEvent>);
+
+            return Tuple.Create(supred, disabling);
+        }
+
+        public static IEnumerable<IEnumerable<T>> PowerSet<T>(List<T> list)
+        {
+            return from m in Enumerable.Range(0, 1 << list.Count)
+                   select
+                       from i in Enumerable.Range(0, list.Count)
+                       where (m & (1 << i)) != 0
+                       select list[i];
         }
 
         private static bool IsConflicting(IEnumerable<DeterministicFiniteAutomaton> supervisors)
