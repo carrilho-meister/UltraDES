@@ -5,8 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml;
@@ -16,16 +14,16 @@ namespace UltraDES
 {
     using Some = Some<AbstractState>;
     using None = None<AbstractState>;
-    using DesablingStructure =  Dictionary<AbstractState, ISet<AbstractEvent>>;
+    using DesablingStructure = Dictionary<AbstractState, ISet<AbstractEvent>>;
 
     [Serializable]
     public sealed class DeterministicFiniteAutomaton
     {
-        private readonly string _name;
-        private readonly int _initial;
-        private readonly AbstractState[] _states;
-        private readonly AbstractEvent[] _events;
         private readonly AdjacencyMatrix _adjacency;
+        private readonly AbstractEvent[] _events;
+        private readonly int _initial;
+        private readonly string _name;
+        private readonly AbstractState[] _states;
 
         public DeterministicFiniteAutomaton(IEnumerable<Transition> transitions, AbstractState initial, string name)
         {
@@ -39,7 +37,7 @@ namespace UltraDES
 
             _initial = Array.IndexOf(_states, initial);
 
-            for (int i = 0; i < _states.Length; i++)
+            for (var i = 0; i < _states.Length; i++)
             {
                 var i1 = i;
                 _adjacency.Add(i,
@@ -51,12 +49,13 @@ namespace UltraDES
             }
         }
 
-        public DeterministicFiniteAutomaton(IEnumerable<Transition> transitions, AbstractEvent[] events, AbstractState initial, string name)
+        public DeterministicFiniteAutomaton(IEnumerable<Transition> transitions, AbstractEvent[] events,
+            AbstractState initial, string name)
         {
             _name = name;
 
             var transitionsLocal = transitions as Transition[] ?? transitions.ToArray();
-            _states = transitionsLocal.SelectMany(t => new[] { t.Origin, t.Destination }).Distinct().ToArray();
+            _states = transitionsLocal.SelectMany(t => new[] {t.Origin, t.Destination}).Distinct().ToArray();
             _events = events;
 
             _adjacency = new AdjacencyMatrix(_states.Length);
@@ -72,7 +71,7 @@ namespace UltraDES
 
             _initial = si[initial];
 
-            for (int i = 0; i < _states.Length; i++)
+            for (var i = 0; i < _states.Length; i++)
             {
                 var i1 = i;
                 _adjacency.Add(i,
@@ -83,108 +82,14 @@ namespace UltraDES
             }
         }
 
-        private DeterministicFiniteAutomaton(AbstractState[] states, AbstractEvent[] events, AdjacencyMatrix adjacency, int initial, string name)
+        private DeterministicFiniteAutomaton(AbstractState[] states, AbstractEvent[] events, AdjacencyMatrix adjacency,
+            int initial, string name)
         {
             _states = states;
             _events = events;
             _name = name;
             _initial = initial;
             _adjacency = adjacency;
-        }
-
-        public void DepthFirstSearch(int initial, BitArray visited)
-        {
-            const int parallelThreshold = 100;
-
-            //if (visited.Length < parallelThreshold)
-            //{
-            //    var s = new Stack<int>();
-            //    s.Push(initial);
-
-            //    while (s.Count != 0)
-            //    {
-            //        var v = s.Pop();
-            //        if (visited[v]) continue;
-
-            //        visited[v] = true;
-
-            //        var neighbors = _adjacency[v].Values.Distinct().ToArray();
-
-            //        foreach (var destination in neighbors)
-            //            s.Push(destination);
-            //    }
-            //}
-            //else
-            //{
-                var frontier = new List<int> {initial};
-
-                while (frontier.Count != 0)
-                {
-                    frontier.ForEach(st => visited[st] = true);
-
-                    if (frontier.Count > parallelThreshold/2)
-                        frontier = frontier.AsParallel()
-                            .SelectMany(v => _adjacency[v].Values)
-                            .Distinct()
-                            .Where(v => !visited[v]).ToList();
-                    else
-                        frontier = frontier
-                            .SelectMany(v => _adjacency[v].Values)
-                            .Distinct()
-                            .Where(v => !visited[v]).ToList();
-                }
-           // }
-        }
-
-        public void InverseDepthFirstSearch(int initial, BitArray states, BitArray visited)
-        {
-            const int parallelThreshold = 100;
-
-            var inverseAdjacency = Enumerable.Range(0, visited.Length).AsParallel().Where(s1 => states[s1])
-                .SelectMany(s1 => _adjacency[s1].Where(s2 => states[s2.Value]).Select(s2 => Tuple.Create(s1, s2.Value)))
-                .GroupBy(t => t.Item2)
-                .ToDictionary(g => g.Key, g => g.Select(t => t.Item1).ToArray());
-
-            var frontier = new List<int> { initial };
-
-            while (frontier.Count != 0)
-            {
-                frontier.ForEach(st => visited[st] = true);
-
-                if (frontier.Count > parallelThreshold / 2)
-                    frontier = frontier.AsParallel()
-                        .SelectMany(v => inverseAdjacency[v])
-                        .Distinct()
-                        .Where(v => !visited[v]).ToList();
-                else
-                    frontier = frontier
-                        .SelectMany(v => inverseAdjacency[v])
-                        .Distinct()
-                        .Where(v => !visited[v]).ToList();
-            }
-        }
-
-        public void InverseDepthFirstSearch(int initial, BitArray visited)
-        {
-            var s = new Stack<int>();
-            s.Push(initial);
-
-            while (s.Count != 0)
-            {
-                var v = s.Pop();
-                if (visited[v]) continue;
-
-                visited[v] = true;
-
-                var neighbors =
-                    Enumerable.Range(0, _adjacency.Length)
-                        .AsParallel()
-                        .Where(s1 => _adjacency[s1].Values.Contains(v))
-                        .ToArray();
-
-                foreach (var dest in neighbors)
-                    s.Push(dest);
-            }
         }
 
         public DeterministicFiniteAutomaton AccessiblePart
@@ -226,58 +131,6 @@ namespace UltraDES
             }
         }
 
-        private static AdjacencyMatrix RemoveStates(BitArray visited, DeterministicFiniteAutomaton G, out AbstractState[] states)
-        {
-            const int parallelThreshold = 1000;
-
-            var map2New = new Dictionary<int,int>(G._states.Length/10);
-            for (int i = 0, k = 0; i < G._states.Length; i++)
-                if (visited[i]) map2New.Add(i, k++);
-
-            var adjacency = new AdjacencyMatrix(Enumerable.Range(0, visited.Count).Count(i => visited[i]));
-
-            if (G._states.Length > parallelThreshold)
-            {
-                Parallel.For(0, G._states.Length, s =>
-                {
-                    if (!map2New.ContainsKey(s)) return;
-                    var i = map2New[s];
-                    for (var e = 0; e < G._events.Length; e++)
-                    {
-                        var k = (G._adjacency[s].ContainsKey(e)) ? G._adjacency[s][e] : -1;
-
-                        if (k == -1 || !map2New.ContainsKey(k)) continue;
-
-                        if (!adjacency[i].ContainsKey(e)) adjacency[i].Add(e, map2New[k]);
-                        else throw new Exception("Nondeterministic automaton");
-                    }
-                });
-            }
-            else
-            {
-                for (var s = 0; s < G._states.Length; s++)
-                {
-                    if (!map2New.ContainsKey(s)) continue;
-                    var i = map2New[s];
-                    for (var e = 0; e < G._events.Length; e++)
-                    {
-                        var k = (G._adjacency[s].ContainsKey(e)) ? G._adjacency[s][e] : -1;
-
-                        if (k == -1 || !map2New.ContainsKey(k)) continue;
-
-                        if (!adjacency[i].ContainsKey(e)) adjacency[i].Add(e, map2New[k]);
-                        else throw new Exception("Nondeterministic automaton");
-                    }
-                }
-            }
-
-            states = G._states.Where((s, i) => visited[i]).ToArray();
-
-            adjacency.TrimExcess();
-
-            return adjacency;
-        }
-
         public DeterministicFiniteAutomaton Trim
         {
             get { return AccessiblePart.CoaccessiblePart; }
@@ -300,7 +153,7 @@ namespace UltraDES
             {
                 var transitions = new HashSet<Transition>();
 
-                for (int i = 0; i < _adjacency.Length; i++)
+                for (var i = 0; i < _adjacency.Length; i++)
                 {
                     var s1 = _states[i];
                     foreach (var kvp in _adjacency[i])
@@ -318,99 +171,6 @@ namespace UltraDES
             }
         }
 
-        public DeterministicFiniteAutomaton Projection(IEnumerable<Event> removeEvents)
-        {
-            var evs = new HashSet<Event>(removeEvents);
-
-            var transitions = Transitions.Select(t =>
-            {
-                if (!evs.Contains(t.Trigger)) return t;
-
-                return new Transition(t.Origin, Epsilon.EpsilonEvent, t.Destination);
-            });
-
-            return Determinize(transitions, InitialState, string.Format("Projection({0})", Name));
-        }
-
-        public DeterministicFiniteAutomaton InverseProjection(IEnumerable<Event> events)
-        {
-            var evs = events.Except(Events).ToList();
-
-            var transitions = Transitions as HashSet<Transition> ?? new HashSet<Transition>();
-
-            transitions.UnionWith(States.SelectMany(s => evs.Select(e => new Transition(s, e, s))));
-
-            return Determinize(transitions, InitialState, string.Format("InvProjection({0})", Name));
-        }
-
-        public static DeterministicFiniteAutomaton Determinize(IEnumerable<Transition> transitions, AbstractState initial, string name)
-        {
-            var visited = new HashSet<AbstractState>();
-            var newTransitions = new List<Transition>();
-            var localTransitions = transitions as Transition[] ?? transitions.ToArray();
-            var events = localTransitions.Select(t => t.Trigger).Distinct().ToArray();
-            var initialSet = EpsilonJumps(localTransitions, initial);
-            var frontier = new HashSet<HashSet<AbstractState>>(HashSet<AbstractState>.CreateSetComparer()) { initialSet };
-
-            while (frontier.Count > 0)
-            {
-                var newFrontier = new HashSet<HashSet<AbstractState>>(HashSet<AbstractState>.CreateSetComparer());
-
-                foreach (var states in frontier)
-                {
-                    var origin = states.Count == 1 ? states.Single() : states.OrderBy(s => s.ToString()).ThenBy(s => s.Marking).Aggregate((a, b) => a.MergeWith(b, 0, false));
-                    visited.Add(origin);
-                    foreach(var e in events)
-                    {
-                        if (e == Epsilon.EpsilonEvent || e == Empty.EmptyEvent) continue;
-
-                        var destinationSet = new HashSet<AbstractState>();
-                        
-                        foreach (var s in states)
-                        {
-                            destinationSet.UnionWith(localTransitions.Where(t => t.Origin == s && t.Trigger == e)
-                                .Select(t => t.Destination)
-                                .SelectMany(s2 => EpsilonJumps(localTransitions, s2)));
-                        }
-
-                        if (destinationSet.Count == 0) continue;
-
-                        var destination = destinationSet.Count == 1 ? destinationSet.Single() : destinationSet.OrderBy(s => s.ToString()).ThenBy(s => s.Marking).Aggregate((a, b) => a.MergeWith(b, 0, false));
-
-                        if (!visited.Contains(destination)) newFrontier.Add(destinationSet);
-
-                        newTransitions.Add(new Transition(origin, e, destination));
-                    }
-                }
-
-                frontier = newFrontier;
-            }
-
-
-            var newInitial = initialSet.Count == 1 ? initialSet.Single() : initialSet.OrderBy(s => s.ToString()).ThenBy(s => s.Marking).Aggregate((a, b) => a.MergeWith(b, 0, false));
-
-            return new DeterministicFiniteAutomaton(newTransitions, newInitial, String.Format("Det({0})", name));
-        }
-
-        private static HashSet<AbstractState> EpsilonJumps(Transition[] transitions, AbstractState initial)
-        {
-            var accessible = new HashSet<AbstractState>();
-            var frontier = new HashSet<AbstractState> { initial };
-
-            while(frontier.Count>0)
-            {
-                var newFrontier = new HashSet<AbstractState>();
-                foreach(var s in frontier)
-                {
-                    accessible.Add(s);
-                    newFrontier.UnionWith(transitions.Where(t => t.Origin == s && t.Trigger == Epsilon.EpsilonEvent && !accessible.Contains(t.Destination)).Select(t => t.Destination));
-                }
-                frontier = newFrontier;
-            }
-
-            return accessible;
-        }
-
         public DeterministicFiniteAutomaton Minimal
         {
             get
@@ -418,9 +178,9 @@ namespace UltraDES
                 var g1 = new HashSet<AbstractState>(MarkedStates);
                 var g2 = new HashSet<AbstractState>(States.Except(g1));
 
-                var partitions = new List<HashSet<AbstractState>> { g1, g2 };
+                var partitions = new List<HashSet<AbstractState>> {g1, g2};
 
-                int size = 0;
+                var size = 0;
 
                 while (partitions.Count > size)
                 {
@@ -500,7 +260,6 @@ namespace UltraDES
         {
             get
             {
-           
                 var t = Enumerable.Range(0, _states.Length).ToArray();
                 var aux = t[0];
                 t[0] = _initial;
@@ -509,38 +268,38 @@ namespace UltraDES
 
                 var tf = _adjacency;
                 var size = _states.Length;
-                RegularExpression[] b = new RegularExpression[size];
-                RegularExpression[,] a = new RegularExpression[size, size];
+                var b = new RegularExpression[size];
+                var a = new RegularExpression[size, size];
 
-                for (int i = 0; i < size; i++)
+                for (var i = 0; i < size; i++)
                     b[i] = _states[t[i]].IsMarked ? Symbol.Epsilon : Symbol.Empty;
 
-                for (int i = 0; i < size; i++)
+                for (var i = 0; i < size; i++)
                 {
-                    for (int j = 0; j < size; j++)
+                    for (var j = 0; j < size; j++)
                     {
                         if (a[i, j] == null) a[i, j] = Symbol.Empty;
-                        for (int k = 0; k < _events.Length; k++)
+                        for (var k = 0; k < _events.Length; k++)
                         {
                             if (tf[t[i], k] == t[j]) a[i, j] += _events[k];
                         }
                     }
                 }
 
-                for (int n = size - 1; n >= 0; n--)
+                for (var n = size - 1; n >= 0; n--)
                 {
-                    b[n] = new KleeneStar(a[n,n]) * b[n];
+                    b[n] = new KleeneStar(a[n, n])*b[n];
                     //b[n] = b[n].Simplify;
-                    for (int j = 0; j <= n; j++)
+                    for (var j = 0; j <= n; j++)
                     {
                         a[n, j] = new KleeneStar(a[n, n])*a[n, j];
                         //a[n, j] = a[n, j].Simplify;
                     }
-                    for (int i = 0; i <= n; i++)
+                    for (var i = 0; i <= n; i++)
                     {
                         b[i] += a[i, n]*b[n];
                         //b[i] = b[i].Simplify;
-                        for (int j = 0; j <= n; j++)
+                        for (var j = 0; j <= n; j++)
                         {
                             a[i, j] += a[i, n]*a[n, j];
                             //a[i, j] = a[i, j].Simplify;
@@ -550,153 +309,6 @@ namespace UltraDES
 
                 return b[0].Simplify;
             }
-        }
-
-        public DeterministicFiniteAutomaton ParallelCompositionWith(DeterministicFiniteAutomaton G2)
-        {
-            const int parallelThreshold = 1000;
-            var G1 = this;
-
-            var events = G1._events.Union(G2._events).ToArray();
-            var states =
-                G1._states.AsParallel()
-                    .AsOrdered()
-                    .SelectMany(
-                        s1 => G2._states
-                            .AsParallel()
-                            .AsOrdered()
-                            .Select(s2 => s1.MergeWith(s2, G2._states.Length))).ToArray();
-
-            var events2G1 = events.AsParallel().AsOrdered().Select(e => Array.IndexOf(G1._events, e)).ToArray();
-            var events2G2 = events.AsParallel().AsOrdered().Select(e => Array.IndexOf(G2._events, e)).ToArray();
-
-            var adjacency = new AdjacencyMatrix(states.Length);
-
-            if (G1._states.Length > parallelThreshold)
-            {
-                Parallel.For(0, G1._states.Length, s1 =>
-                {
-                    //for (var s2 = 0; s2 < G2._states.Length; s2++)
-                    Parallel.For(0, G2._states.Length, s2 =>
-                    {
-                        for (var e = 0; e < events.Length; e++)
-                        {
-                            var origin = s1*G2._states.Length + s2;
-
-                            var dest1 = events2G1[e] == -1
-                                ? s1
-                                : (G1._adjacency[s1].ContainsKey(events2G1[e]))
-                                    ? G1._adjacency[s1][events2G1[e]]
-                                    : -1;
-
-                            var dest2 = events2G2[e] == -1
-                                ? s2
-                                : (G2._adjacency[s2].ContainsKey(events2G2[e]))
-                                    ? G2._adjacency[s2][events2G2[e]]
-                                    : -1;
-
-                            if (dest1 == -1 || dest2 == -1) continue;
-
-                            var destination = dest1*G2._states.Length + dest2;
-
-                            if (!adjacency[origin].ContainsKey(e)) adjacency[origin].Add(e, destination);
-                            else throw new Exception("Nondeterministic automaton");
-                        }
-                    });
-                });
-            }
-            else
-            {
-                for (int s1 = 0; s1 < G1._states.Length; s1++)
-                {
-                    for (int s2 = 0; s2 < G2._states.Length; s2++)
-                    {
-                        for (int e = 0; e < events.Length; e++)
-                        {
-                            var origin = s1 * G2._states.Length + s2;
-
-                            var dest1 = events2G1[e] == -1
-                                ? s1
-                                : (G1._adjacency[s1].ContainsKey(events2G1[e]))
-                                    ? G1._adjacency[s1][events2G1[e]]
-                                    : -1;
-
-                            var dest2 = events2G2[e] == -1
-                                ? s2
-                                : (G2._adjacency[s2].ContainsKey(events2G2[e]))
-                                    ? G2._adjacency[s2][events2G2[e]]
-                                    : -1;
-
-                            if (dest1 == -1 || dest2 == -1) continue;
-
-                            var destination = dest1 * G2._states.Length + dest2;
-
-                            if (!adjacency[origin].ContainsKey(e)) adjacency[origin].Add(e, destination);
-                            else throw new Exception("Nondeterministic automaton");
-                        }
-                    }
-                }
-            }
-
-            var initial = G1._initial*G2._states.Length + G2._initial;
-
-            adjacency.TrimExcess();
-
-            return new DeterministicFiniteAutomaton(states, events, adjacency, initial,
-                String.Format("{0}||{1}", G1._name, G2._name)).AccessiblePart;
-        }
-        public DeterministicFiniteAutomaton ProductWith(DeterministicFiniteAutomaton G2)
-        {
-            var G1 = this;
-
-            var events = G1._events.Intersect(G2._events).ToArray();
-            var states =
-                G1._states.AsParallel()
-                    .AsOrdered()
-                    .SelectMany(
-                        s1 => G2._states
-                            .AsParallel()
-                            .AsOrdered()
-                            .Select(s2 => s1.MergeWith(s2, G2._states.Length)))
-                    .ToArray();
-
-            var events2G1 = events.AsParallel().AsOrdered().Select(e => Array.IndexOf(G1._events, e)).ToArray();
-            var events2G2 = events.AsParallel().AsOrdered().Select(e => Array.IndexOf(G2._events, e)).ToArray();
-
-            var adjacency = new AdjacencyMatrix(states.Length);
-
-            for (int s1 = 0; s1 < G1._states.Length; s1++)
-            {
-                for (int s2 = 0; s2 < G2._states.Length; s2++)
-                {
-                    for (int e = 0; e < events.Length; e++)
-                    {
-                        var origin = s1 * G2._states.Length + s2;
-
-                        var dest1 = (G1._adjacency[s1].ContainsKey(events2G1[e]))
-                            ? G1._adjacency[s1][events2G1[e]]
-                            : -1;
-
-                        var dest2 = (G2._adjacency[s2].ContainsKey(events2G2[e]))
-                            ? G2._adjacency[s2][events2G2[e]]
-                            : -1;
-
-                        if (dest1 == -1 || dest2 == -1) continue;
-
-                        var destination = dest1 * G2._states.Length + dest2;
-
-                        if (!adjacency[origin].ContainsKey(e)) adjacency[origin].Add(e, destination);
-                        else throw new Exception("Nondeterministic automaton");
-                    }
-                }
-            }
-
-            var initial = G1._initial * G2._states.Length + G2._initial;
-
-            adjacency.TrimExcess();
-
-            return new DeterministicFiniteAutomaton(states, events, adjacency, initial,
-                String.Format("{0}||{1}", G1._name, G2._name)).AccessiblePart;
         }
 
         public IEnumerable<AbstractState> States
@@ -763,6 +375,483 @@ namespace UltraDES
             }
         }
 
+        public IEnumerable<Transition> Transitions
+        {
+            get
+            {
+                for (var i = 0; i < _adjacency.Length; i++)
+                {
+                    var s1 = _states[i];
+                    foreach (var kvp in _adjacency[i])
+                    {
+                        var e = _events[kvp.Key];
+                        var s2 = _states[kvp.Value];
+
+                        yield return (new Transition(s1, e, s2));
+                    }
+                }
+            }
+        }
+
+        public string ToXML
+        {
+            get
+            {
+                var doc = new XmlDocument();
+                var automaton = (XmlElement) doc.AppendChild(doc.CreateElement("Automaton"));
+                automaton.SetAttribute("Name", _name);
+
+                var states = (XmlElement) automaton.AppendChild(doc.CreateElement("States"));
+                for (var i = 0; i < _states.Length; i++)
+                {
+                    var state = _states[i];
+
+                    var s = ((XmlElement) states.AppendChild(doc.CreateElement("State")));
+                    s.SetAttribute("Name", state.ToString());
+                    s.SetAttribute("Marking", state.Marking.ToString());
+                    s.SetAttribute("Id", i.ToString());
+                }
+
+                var initial = (XmlElement) automaton.AppendChild(doc.CreateElement("InitialState"));
+                initial.SetAttribute("Id", _initial.ToString());
+
+                var events = (XmlElement) automaton.AppendChild(doc.CreateElement("Events"));
+                for (var i = 0; i < _events.Length; i++)
+                {
+                    var @event = _events[i];
+
+                    var e = ((XmlElement) events.AppendChild(doc.CreateElement("Event")));
+                    e.SetAttribute("Name", @event.ToString());
+                    e.SetAttribute("Controllability", @event.Controllability.ToString());
+                    e.SetAttribute("Id", i.ToString());
+                }
+
+                var transitions = (XmlElement) automaton.AppendChild(doc.CreateElement("Transitions"));
+                for (var i = 0; i < _states.Length; i++)
+                {
+                    for (var j = 0; j < _events.Length; j++)
+                    {
+                        var k = _adjacency[i].ContainsKey(j) ? _adjacency[i][j] : -1;
+                        if (k == -1) continue;
+
+                        var t = (XmlElement) transitions.AppendChild(doc.CreateElement("Transition"));
+
+                        t.SetAttribute("Origin", i.ToString());
+                        t.SetAttribute("Trigger", j.ToString());
+                        t.SetAttribute("Destination", k.ToString());
+                    }
+                }
+
+                return doc.OuterXml;
+            }
+        }
+
+        public void DepthFirstSearch(int initial, BitArray visited)
+        {
+            const int parallelThreshold = 100;
+
+            //if (visited.Length < parallelThreshold)
+            //{
+            //    var s = new Stack<int>();
+            //    s.Push(initial);
+
+            //    while (s.Count != 0)
+            //    {
+            //        var v = s.Pop();
+            //        if (visited[v]) continue;
+
+            //        visited[v] = true;
+
+            //        var neighbors = _adjacency[v].Values.Distinct().ToArray();
+
+            //        foreach (var destination in neighbors)
+            //            s.Push(destination);
+            //    }
+            //}
+            //else
+            //{
+            var frontier = new List<int> {initial};
+
+            while (frontier.Count != 0)
+            {
+                frontier.ForEach(st => visited[st] = true);
+
+                if (frontier.Count > parallelThreshold/2)
+                    frontier = frontier.AsParallel()
+                        .SelectMany(v => _adjacency[v].Values)
+                        .Distinct()
+                        .Where(v => !visited[v]).ToList();
+                else
+                    frontier = frontier
+                        .SelectMany(v => _adjacency[v].Values)
+                        .Distinct()
+                        .Where(v => !visited[v]).ToList();
+            }
+            // }
+        }
+
+        public void InverseDepthFirstSearch(int initial, BitArray states, BitArray visited)
+        {
+            const int parallelThreshold = 100;
+
+            var inverseAdjacency = Enumerable.Range(0, visited.Length).AsParallel().Where(s1 => states[s1])
+                .SelectMany(s1 => _adjacency[s1].Where(s2 => states[s2.Value]).Select(s2 => Tuple.Create(s1, s2.Value)))
+                .GroupBy(t => t.Item2)
+                .ToDictionary(g => g.Key, g => g.Select(t => t.Item1).ToArray());
+
+            var frontier = new List<int> {initial};
+
+            while (frontier.Count != 0)
+            {
+                frontier.ForEach(st => visited[st] = true);
+
+                if (frontier.Count > parallelThreshold/2)
+                    frontier = frontier.AsParallel()
+                        .SelectMany(v => inverseAdjacency[v])
+                        .Distinct()
+                        .Where(v => !visited[v]).ToList();
+                else
+                    frontier = frontier
+                        .SelectMany(v => inverseAdjacency[v])
+                        .Distinct()
+                        .Where(v => !visited[v]).ToList();
+            }
+        }
+
+        public void InverseDepthFirstSearch(int initial, BitArray visited)
+        {
+            var s = new Stack<int>();
+            s.Push(initial);
+
+            while (s.Count != 0)
+            {
+                var v = s.Pop();
+                if (visited[v]) continue;
+
+                visited[v] = true;
+
+                var neighbors =
+                    Enumerable.Range(0, _adjacency.Length)
+                        .AsParallel()
+                        .Where(s1 => _adjacency[s1].Values.Contains(v))
+                        .ToArray();
+
+                foreach (var dest in neighbors)
+                    s.Push(dest);
+            }
+        }
+
+        private static AdjacencyMatrix RemoveStates(BitArray visited, DeterministicFiniteAutomaton G,
+            out AbstractState[] states)
+        {
+            const int parallelThreshold = 1000;
+
+            var map2New = new Dictionary<int, int>(G._states.Length/10);
+            for (int i = 0, k = 0; i < G._states.Length; i++)
+                if (visited[i]) map2New.Add(i, k++);
+
+            var adjacency = new AdjacencyMatrix(Enumerable.Range(0, visited.Count).Count(i => visited[i]));
+
+            if (G._states.Length > parallelThreshold)
+            {
+                Parallel.For(0, G._states.Length, s =>
+                {
+                    if (!map2New.ContainsKey(s)) return;
+                    var i = map2New[s];
+                    for (var e = 0; e < G._events.Length; e++)
+                    {
+                        var k = (G._adjacency[s].ContainsKey(e)) ? G._adjacency[s][e] : -1;
+
+                        if (k == -1 || !map2New.ContainsKey(k)) continue;
+
+                        if (!adjacency[i].ContainsKey(e)) adjacency[i].Add(e, map2New[k]);
+                        else throw new Exception("Nondeterministic automaton");
+                    }
+                });
+            }
+            else
+            {
+                for (var s = 0; s < G._states.Length; s++)
+                {
+                    if (!map2New.ContainsKey(s)) continue;
+                    var i = map2New[s];
+                    for (var e = 0; e < G._events.Length; e++)
+                    {
+                        var k = (G._adjacency[s].ContainsKey(e)) ? G._adjacency[s][e] : -1;
+
+                        if (k == -1 || !map2New.ContainsKey(k)) continue;
+
+                        if (!adjacency[i].ContainsKey(e)) adjacency[i].Add(e, map2New[k]);
+                        else throw new Exception("Nondeterministic automaton");
+                    }
+                }
+            }
+
+            states = G._states.Where((s, i) => visited[i]).ToArray();
+
+            adjacency.TrimExcess();
+
+            return adjacency;
+        }
+
+        public DeterministicFiniteAutomaton Projection(IEnumerable<Event> removeEvents)
+        {
+            var evs = new HashSet<Event>(removeEvents);
+
+            var transitions = Transitions.Select(t =>
+            {
+                if (!evs.Contains(t.Trigger)) return t;
+
+                return new Transition(t.Origin, Epsilon.EpsilonEvent, t.Destination);
+            });
+
+            return Determinize(transitions, InitialState, string.Format("Projection({0})", Name));
+        }
+
+        public DeterministicFiniteAutomaton InverseProjection(IEnumerable<Event> events)
+        {
+            var evs = events.Except(Events).ToList();
+
+            var transitions = Transitions as HashSet<Transition> ?? new HashSet<Transition>();
+
+            transitions.UnionWith(States.SelectMany(s => evs.Select(e => new Transition(s, e, s))));
+
+            return Determinize(transitions, InitialState, string.Format("InvProjection({0})", Name));
+        }
+
+        public static DeterministicFiniteAutomaton Determinize(IEnumerable<Transition> transitions,
+            AbstractState initial, string name)
+        {
+            var visited = new HashSet<AbstractState>();
+            var newTransitions = new List<Transition>();
+            var localTransitions = transitions as Transition[] ?? transitions.ToArray();
+            var events = localTransitions.Select(t => t.Trigger).Distinct().ToArray();
+            var initialSet = EpsilonJumps(localTransitions, initial);
+            var frontier = new HashSet<HashSet<AbstractState>>(HashSet<AbstractState>.CreateSetComparer()) {initialSet};
+
+            while (frontier.Count > 0)
+            {
+                var newFrontier = new HashSet<HashSet<AbstractState>>(HashSet<AbstractState>.CreateSetComparer());
+
+                foreach (var states in frontier)
+                {
+                    var origin = states.Count == 1
+                        ? states.Single()
+                        : states.OrderBy(s => s.ToString())
+                            .ThenBy(s => s.Marking)
+                            .Aggregate((a, b) => a.MergeWith(b, 0, false));
+                    visited.Add(origin);
+                    foreach (var e in events)
+                    {
+                        if (e == Epsilon.EpsilonEvent || e == Empty.EmptyEvent) continue;
+
+                        var destinationSet = new HashSet<AbstractState>();
+
+                        foreach (var s in states)
+                        {
+                            destinationSet.UnionWith(localTransitions.Where(t => t.Origin == s && t.Trigger == e)
+                                .Select(t => t.Destination)
+                                .SelectMany(s2 => EpsilonJumps(localTransitions, s2)));
+                        }
+
+                        if (destinationSet.Count == 0) continue;
+
+                        var destination = destinationSet.Count == 1
+                            ? destinationSet.Single()
+                            : destinationSet.OrderBy(s => s.ToString())
+                                .ThenBy(s => s.Marking)
+                                .Aggregate((a, b) => a.MergeWith(b, 0, false));
+
+                        if (!visited.Contains(destination)) newFrontier.Add(destinationSet);
+
+                        newTransitions.Add(new Transition(origin, e, destination));
+                    }
+                }
+
+                frontier = newFrontier;
+            }
+
+
+            var newInitial = initialSet.Count == 1
+                ? initialSet.Single()
+                : initialSet.OrderBy(s => s.ToString())
+                    .ThenBy(s => s.Marking)
+                    .Aggregate((a, b) => a.MergeWith(b, 0, false));
+
+            return new DeterministicFiniteAutomaton(newTransitions, newInitial, string.Format("Det({0})", name));
+        }
+
+        private static HashSet<AbstractState> EpsilonJumps(Transition[] transitions, AbstractState initial)
+        {
+            var accessible = new HashSet<AbstractState>();
+            var frontier = new HashSet<AbstractState> {initial};
+
+            while (frontier.Count > 0)
+            {
+                var newFrontier = new HashSet<AbstractState>();
+                foreach (var s in frontier)
+                {
+                    accessible.Add(s);
+                    newFrontier.UnionWith(
+                        transitions.Where(
+                            t =>
+                                t.Origin == s && t.Trigger == Epsilon.EpsilonEvent &&
+                                !accessible.Contains(t.Destination)).Select(t => t.Destination));
+                }
+                frontier = newFrontier;
+            }
+
+            return accessible;
+        }
+
+        public DeterministicFiniteAutomaton ParallelCompositionWith(DeterministicFiniteAutomaton G2)
+        {
+            const int parallelThreshold = 1000;
+            var G1 = this;
+
+            var events = G1._events.Union(G2._events).ToArray();
+            AbstractState[] states =
+                G1._states.AsParallel()
+                    .AsOrdered()
+                    .SelectMany(
+                        s1 => G2._states
+                            .AsParallel()
+                            .AsOrdered()
+                            .Select(s2 => s1.MergeWith(s2, G2._states.Length))).ToArray();
+
+            var events2G1 = events.AsParallel().AsOrdered().Select(e => Array.IndexOf(G1._events, e)).ToArray();
+            var events2G2 = events.AsParallel().AsOrdered().Select(e => Array.IndexOf(G2._events, e)).ToArray();
+
+            var adjacency = new AdjacencyMatrix(states.Length);
+
+            if (G1._states.Length > parallelThreshold)
+            {
+                Parallel.For(0, G1._states.Length, s1 =>
+                {
+                    //for (var s2 = 0; s2 < G2._states.Length; s2++)
+                    Parallel.For(0, G2._states.Length, s2 =>
+                    {
+                        for (var e = 0; e < events.Length; e++)
+                        {
+                            var origin = s1*G2._states.Length + s2;
+
+                            var dest1 = events2G1[e] == -1
+                                ? s1
+                                : (G1._adjacency[s1].ContainsKey(events2G1[e]))
+                                    ? G1._adjacency[s1][events2G1[e]]
+                                    : -1;
+
+                            var dest2 = events2G2[e] == -1
+                                ? s2
+                                : (G2._adjacency[s2].ContainsKey(events2G2[e]))
+                                    ? G2._adjacency[s2][events2G2[e]]
+                                    : -1;
+
+                            if (dest1 == -1 || dest2 == -1) continue;
+
+                            var destination = dest1*G2._states.Length + dest2;
+
+                            if (!adjacency[origin].ContainsKey(e)) adjacency[origin].Add(e, destination);
+                            else throw new Exception("Nondeterministic automaton");
+                        }
+                    });
+                });
+            }
+            else
+            {
+                for (var s1 = 0; s1 < G1._states.Length; s1++)
+                {
+                    for (var s2 = 0; s2 < G2._states.Length; s2++)
+                    {
+                        for (var e = 0; e < events.Length; e++)
+                        {
+                            var origin = s1*G2._states.Length + s2;
+
+                            var dest1 = events2G1[e] == -1
+                                ? s1
+                                : (G1._adjacency[s1].ContainsKey(events2G1[e]))
+                                    ? G1._adjacency[s1][events2G1[e]]
+                                    : -1;
+
+                            var dest2 = events2G2[e] == -1
+                                ? s2
+                                : (G2._adjacency[s2].ContainsKey(events2G2[e]))
+                                    ? G2._adjacency[s2][events2G2[e]]
+                                    : -1;
+
+                            if (dest1 == -1 || dest2 == -1) continue;
+
+                            var destination = dest1*G2._states.Length + dest2;
+
+                            if (!adjacency[origin].ContainsKey(e)) adjacency[origin].Add(e, destination);
+                            else throw new Exception("Nondeterministic automaton");
+                        }
+                    }
+                }
+            }
+
+            var initial = G1._initial*G2._states.Length + G2._initial;
+
+            adjacency.TrimExcess();
+
+            return new DeterministicFiniteAutomaton(states, events, adjacency, initial,
+                string.Format("{0}||{1}", G1._name, G2._name)).AccessiblePart;
+        }
+
+        public DeterministicFiniteAutomaton ProductWith(DeterministicFiniteAutomaton G2)
+        {
+            var G1 = this;
+
+            var events = G1._events.Intersect(G2._events).ToArray();
+            AbstractState[] states =
+                G1._states.AsParallel()
+                    .AsOrdered()
+                    .SelectMany(
+                        s1 => G2._states
+                            .AsParallel()
+                            .AsOrdered()
+                            .Select(s2 => s1.MergeWith(s2, G2._states.Length)))
+                    .ToArray();
+
+            var events2G1 = events.AsParallel().AsOrdered().Select(e => Array.IndexOf(G1._events, e)).ToArray();
+            var events2G2 = events.AsParallel().AsOrdered().Select(e => Array.IndexOf(G2._events, e)).ToArray();
+
+            var adjacency = new AdjacencyMatrix(states.Length);
+
+            for (var s1 = 0; s1 < G1._states.Length; s1++)
+            {
+                for (var s2 = 0; s2 < G2._states.Length; s2++)
+                {
+                    for (var e = 0; e < events.Length; e++)
+                    {
+                        var origin = s1*G2._states.Length + s2;
+
+                        var dest1 = (G1._adjacency[s1].ContainsKey(events2G1[e]))
+                            ? G1._adjacency[s1][events2G1[e]]
+                            : -1;
+
+                        var dest2 = (G2._adjacency[s2].ContainsKey(events2G2[e]))
+                            ? G2._adjacency[s2][events2G2[e]]
+                            : -1;
+
+                        if (dest1 == -1 || dest2 == -1) continue;
+
+                        var destination = dest1*G2._states.Length + dest2;
+
+                        if (!adjacency[origin].ContainsKey(e)) adjacency[origin].Add(e, destination);
+                        else throw new Exception("Nondeterministic automaton");
+                    }
+                }
+            }
+
+            var initial = G1._initial*G2._states.Length + G2._initial;
+
+            adjacency.TrimExcess();
+
+            return new DeterministicFiniteAutomaton(states, events, adjacency, initial,
+                string.Format("{0}||{1}", G1._name, G2._name)).AccessiblePart;
+        }
+
         public static DeterministicFiniteAutomaton MonoliticSupervisor(IEnumerable<DeterministicFiniteAutomaton> plants,
             IEnumerable<DeterministicFiniteAutomaton> specifications, bool nonBlocking = false)
         {
@@ -795,7 +884,7 @@ namespace UltraDES
                     .OfType<AbstractCompoundState>()
                     .Select(sr => Array.IndexOf(plant._states, sr.S1)).ToArray();
 
-            bool change = true;
+            var change = true;
 
             var marked = result._states.Select((s, i) => s.IsMarked ? i : -1)
                 .Where(s => s != -1)
@@ -804,7 +893,7 @@ namespace UltraDES
             while (change)
             {
                 change = VerifyControlabillity(result, plant, result2Plant, allowed);
-                if(nonBlocking)
+                if (nonBlocking)
                     change |= VerifyNonblocking(result, marked, allowed);
             }
 
@@ -816,7 +905,7 @@ namespace UltraDES
 
             return
                 new DeterministicFiniteAutomaton(states, result._events, adjacency, initial,
-                    String.Format("Sup({0})", result.Name));
+                    string.Format("Sup({0})", result.Name));
         }
 
         private static bool VerifyNonblocking(DeterministicFiniteAutomaton result, List<int> marked, BitArray allowed)
@@ -828,16 +917,17 @@ namespace UltraDES
             return Enumerable.Range(0, visited.Length).Any(i => allowed[i] && !visited[i]);
         }
 
-        private static bool VerifyControlabillity(DeterministicFiniteAutomaton result, DeterministicFiniteAutomaton plant,
+        private static bool VerifyControlabillity(DeterministicFiniteAutomaton result,
+            DeterministicFiniteAutomaton plant,
             IReadOnlyList<int> result2Plant, BitArray allowed)
         {
-            bool change = false;
+            var change = false;
 
-            for (int s1 = 0; s1 < result._states.Length; s1++)
+            for (var s1 = 0; s1 < result._states.Length; s1++)
             {
                 if (!allowed[s1]) continue;
 
-                for (int e = 0; e < result._events.Length; e++)
+                for (var e = 0; e < result._events.Length; e++)
                 {
                     if (result._events[e].IsControllable) continue;
 
@@ -859,34 +949,35 @@ namespace UltraDES
             return change;
         }
 
-        public static IEnumerable<DeterministicFiniteAutomaton> LocalModularSupervisor(IEnumerable<DeterministicFiniteAutomaton> plants,
-            IEnumerable<DeterministicFiniteAutomaton> specifications)
-        {
-            var dic = specifications.ToDictionary(e =>
-            {
-                return plants.Where(p => p._events.Intersect(e._events).Any()).ToArray();
-            });
+        //public static IEnumerable<DeterministicFiniteAutomaton> LocalModularSupervisor(
+        //    IEnumerable<DeterministicFiniteAutomaton> plants,
+        //    IEnumerable<DeterministicFiniteAutomaton> specifications)
+        //{
+        //    var dic =
+        //        specifications.ToDictionary(
+        //            e => { return plants.Where(p => p._events.Intersect(e._events).Any()).ToArray(); });
 
-            var supervisors =
-                dic.AsParallel()
-                    .WithExecutionMode(ParallelExecutionMode.ForceParallelism)
-                    .Select(automata => MonoliticSupervisor(automata.Key, new[] {automata.Value}))
-                    .ToList();
+        //    var supervisors =
+        //        dic.AsParallel()
+        //            .WithExecutionMode(ParallelExecutionMode.ForceParallelism)
+        //            .Select(automata => MonoliticSupervisor(automata.Key, new[] {automata.Value}))
+        //            .ToList();
 
-            if (IsConflicting(supervisors)) throw new Exception("conflicting supervisors");
+        //    if (IsConflicting(supervisors)) throw new Exception("conflicting supervisors");
 
-            return supervisors;
-        }
+        //    return supervisors;
+        //}
 
         public static IEnumerable<DeterministicFiniteAutomaton> LocalModularSupervisor(
             IEnumerable<DeterministicFiniteAutomaton> plants,
             IEnumerable<DeterministicFiniteAutomaton> specifications,
-            IEnumerable<DeterministicFiniteAutomaton> conflictResolvingSupervisor)
+            IEnumerable<DeterministicFiniteAutomaton> conflictResolvingSupervisor = null)
         {
-            var dic = specifications.ToDictionary(e =>
-            {
-                return plants.Where(p => p._events.Intersect(e._events).Any()).ToArray();
-            });
+            if (conflictResolvingSupervisor == null) conflictResolvingSupervisor = new DeterministicFiniteAutomaton[0];
+
+            var dic =
+                specifications.ToDictionary(
+                    e => { return plants.Where(p => p._events.Intersect(e._events).Any()).ToArray(); });
 
             var supervisors =
                 dic.AsParallel()
@@ -904,11 +995,42 @@ namespace UltraDES
             return complete;
         }
 
-        public static IEnumerable<Tuple<DeterministicFiniteAutomaton, DesablingStructure>> LocalModularReducedSupervisor(
+        public static IEnumerable<DeterministicFiniteAutomaton> LocalModularSupervisor(
+            IEnumerable<DeterministicFiniteAutomaton> plants,
+            IEnumerable<DeterministicFiniteAutomaton> specifications,
+            out List<DeterministicFiniteAutomaton> compoundPlants,
+            IEnumerable<DeterministicFiniteAutomaton> conflictResolvingSupervisor = null)
+        {
+            if (conflictResolvingSupervisor == null) conflictResolvingSupervisor = new DeterministicFiniteAutomaton[0];
+
+            var dic =
+                specifications.ToDictionary(
+                    e => { return plants.Where(p => p._events.Intersect(e._events).Any()).Aggregate((a, b) => a.ParallelCompositionWith(b)).CoaccessiblePart; });
+
+            var supervisors =
+                dic.AsParallel()
+                    .WithExecutionMode(ParallelExecutionMode.ForceParallelism)
+                    .Select(automata => MonoliticSupervisor(new[]{automata.Key}, new[] { automata.Value }))
+                    .ToList();
+
+            var complete = supervisors.Union(conflictResolvingSupervisor).ToList();
+
+            if (IsConflicting(complete))
+            {
+                throw new Exception("conflicting supervisors");
+            }
+
+            compoundPlants = dic.Keys.ToList();
+
+            return complete;
+        }
+
+        public static IEnumerable<Tuple<DeterministicFiniteAutomaton, DesablingStructure>> LocalModularReducedSupervisor
+            (
             IEnumerable<DeterministicFiniteAutomaton> plants,
             IEnumerable<DeterministicFiniteAutomaton> specifications,
             IEnumerable<Tuple<IEnumerable<DeterministicFiniteAutomaton>,
-            IEnumerable<DeterministicFiniteAutomaton>>> conflictResolvingSupervisor = null)
+                IEnumerable<DeterministicFiniteAutomaton>>> conflictResolvingSupervisor = null)
         {
             if (conflictResolvingSupervisor == null)
                 conflictResolvingSupervisor = new List<Tuple<IEnumerable<DeterministicFiniteAutomaton>,
@@ -920,28 +1042,33 @@ namespace UltraDES
                 dic.AsParallel()
                     .AsOrdered()
                     .WithExecutionMode(ParallelExecutionMode.ForceParallelism)
-                    .Select(automata => MonoliticSupervisor(automata.Key, new[] { automata.Value }))
+                    .Select(automata => MonoliticSupervisor(automata.Key, new[] {automata.Value}))
                     .ToList();
 
-            var pp = dic.Select(m=>m.Key.Aggregate((a, b) => a.ParallelCompositionWith(b)).CoaccessiblePart).ToList();
-            pp.AddRange(conflictResolvingSupervisor.Select(crs => crs.Item1.Aggregate((a, b) => a.ParallelCompositionWith(b)).CoaccessiblePart));
-            var ee = dic.Select(m => m.Value).ToList();
-            ee.AddRange(conflictResolvingSupervisor.Select(crs => crs.Item2.Aggregate((a, b) => a.ParallelCompositionWith(b)).CoaccessiblePart));
             var ss = supervisors.ToList();
-            ss.AddRange(conflictResolvingSupervisor.Select(crs=>MonoliticSupervisor(crs.Item1,crs.Item2)));
+            ss.AddRange(conflictResolvingSupervisor.Select(crs => MonoliticSupervisor(crs.Item1, crs.Item2)));
 
-            
 
-            //if (IsConflicting(ss))
-            //{
-            //    throw new Exception("conflicting supervisors");
-            //}
+            if (IsConflicting(ss))
+            {
+                throw new Exception("conflicting supervisors");
+            }
 
-            return pp.Select((t, i) => ReduceSupervisor(t, ss[i],ee[i]._events)).ToList();
+            var pp = dic.Select(m => m.Key.Aggregate((a, b) => a.ParallelCompositionWith(b)).CoaccessiblePart).ToList();
+            pp.AddRange(
+                conflictResolvingSupervisor.Select(
+                    crs => crs.Item1.Aggregate((a, b) => a.ParallelCompositionWith(b)).CoaccessiblePart));
+            var ee = dic.Select(m => m.Value).ToList();
+            ee.AddRange(
+                conflictResolvingSupervisor.Select(
+                    crs => crs.Item2.Aggregate((a, b) => a.ParallelCompositionWith(b)).CoaccessiblePart));
+
+            return pp.AsParallel().AsOrdered().Select((t, i) => ReduceSupervisor(t, ss[i], ee[i]._events)).ToList();
         }
 
         public static Tuple<DeterministicFiniteAutomaton, DesablingStructure>
-            ReduceSupervisor(DeterministicFiniteAutomaton plant, DeterministicFiniteAutomaton supervisor, IEnumerable<AbstractEvent> events)
+            ReduceSupervisor(DeterministicFiniteAutomaton plant, DeterministicFiniteAutomaton supervisor,
+                IEnumerable<AbstractEvent> events)
         {
             var states = supervisor._states;
 
@@ -961,15 +1088,16 @@ namespace UltraDES
 
             var R = new Dictionary<Tuple<AbstractState, AbstractState>, List<Tuple<AbstractState, AbstractState>>>();
 
-            for (int i = 0; i < states.Length - 1; i++)
+            for (var i = 0; i < states.Length - 1; i++)
             {
-                for (int j = i + 1; j < states.Length; j++)
+                for (var j = i + 1; j < states.Length; j++)
                 {
                     var x1 = states[i];
                     var x2 = states[j];
-                    bool c1 = !E[x1].Intersect(D[x2]).Any() && !E[x2].Intersect(D[x1]).Any();
+                    var c1 = !E[x1].Intersect(D[x2]).Any() && !E[x2].Intersect(D[x1]).Any();
+                    var c2 = x1.Marking == x2.Marking;
 
-                    if (!c1)
+                    if (!c1 || !c2)
                     {
                         R.Add(Tuple.Create(x1, x2), null);
                         continue;
@@ -997,13 +1125,16 @@ namespace UltraDES
                 }
             }
 
-            bool change = true;
+            var change = true;
 
             while (change)
             {
                 change = false;
 
-                foreach (var kvp in new Dictionary<Tuple<AbstractState, AbstractState>, List<Tuple<AbstractState, AbstractState>>>(R))
+                foreach (
+                    var kvp in
+                        new Dictionary<Tuple<AbstractState, AbstractState>, List<Tuple<AbstractState, AbstractState>>>(R)
+                    )
                 {
                     if (kvp.Value == null || !kvp.Value.Any()) continue;
 
@@ -1053,13 +1184,13 @@ namespace UltraDES
                 new HashSet<HashSet<AbstractState>>(states.Select(x => new HashSet<AbstractState> {x}))
             };
 
-            bool flag = false;
+            var flag = false;
             var n = 1;
 
             while (!flag)
             {
                 flag = true;
-                foreach (var Ci in C[n-1])
+                foreach (var Ci in C[n - 1])
                 {
                     foreach (var x1 in states)
                     {
@@ -1069,7 +1200,7 @@ namespace UltraDES
                             )) continue;
 
 
-                        if(C.Count<n+1) C.Add(new HashSet<HashSet<AbstractState>>());
+                        if (C.Count < n + 1) C.Add(new HashSet<HashSet<AbstractState>>());
 
                         var aux = new HashSet<AbstractState>(Ci) {x1};
 
@@ -1096,54 +1227,76 @@ namespace UltraDES
                 tot.UnionWith(chosen);
             }
 
-            var opt = new List<HashSet<HashSet<AbstractState>>>();
+            //foreach (var cc in PowerSet(CC.ToArray(), 1, states.Length))
+            //{
+            //    if (cc.SelectMany(el => el).Distinct().Count() != states.Length) continue;
+            //    Cn = new HashSet<HashSet<AbstractState>>(cc);
+            //    break;
+            //}
 
 
             var st = Cn.ToDictionary(o => o, o => o.Aggregate((a, b) => a.MergeWith(b).ToMarked));
 
-            var transitions = new List<Transition>();
+            var disabled =
+                Cn.SelectMany(X => X.Aggregate(new AbstractEvent[0], (a, b) => a.Union(D[b]).ToArray()))
+                    .Distinct()
+                    .ToList();
 
-            var disabled = Cn.SelectMany(X => X.Aggregate(new AbstractEvent[0], (a, b) => a.Union(D[b]).ToArray())).Distinct().ToList();
-
-            foreach (var X in Cn)
-            {
-                var ev = X.Aggregate(new List<AbstractEvent>(), (a, b) => a.Union(E[b]).ToList());
-
-                foreach (var e in ev.Intersect(events.Union(disabled)))
-                {
-
-                    var dest =
-                        X.SelectMany(
-                            x =>
-                                supervisor.Transitions.Where(t => t.Origin == x && t.Trigger == e)
-                                    .Select(t => t.Destination))
-                            .Distinct()
-                            .ToList();
-
-                    var X2 = Cn.SingleOrDefault(X1 => dest.TrueForAll(X1.Contains));
-
-                    transitions.Add(new Transition(st[X], e, st[X2]));
-                }
-            }
+            var transitions = (from X in Cn
+                let ev = X.Aggregate(new List<AbstractEvent>(), (a, b) => a.Union(E[b]).ToList())
+                from e in ev.Intersect(events.Union(disabled))
+                let dest =
+                    X.SelectMany(
+                        x =>
+                            supervisor.Transitions.Where(t => t.Origin == x && t.Trigger == e)
+                                .Select(t => t.Destination)).Distinct().ToList()
+                let X2 = Cn.SingleOrDefault(X1 => dest.TrueForAll(X1.Contains))
+                select new Transition(st[X], e, st[X2])).ToList();
 
             var initial = st[Cn.First(X => X.Contains(supervisor.InitialState))];
 
             var supred = new DeterministicFiniteAutomaton(transitions, initial,
-                String.Format("SupRed({0})", supervisor._name)).Trim;
+                string.Format("SupRed({0})", supervisor._name)).Trim;
 
             var disabling = Cn.ToDictionary(X => st[X],
-               X => new HashSet<AbstractEvent>(X.Aggregate(new AbstractEvent[0], (a, b) => a.Union(D[b]).ToArray())) as ISet<AbstractEvent>);
+                X =>
+                    new HashSet<AbstractEvent>(X.Aggregate(new AbstractEvent[0], (a, b) => a.Union(D[b]).ToArray())) as
+                        ISet<AbstractEvent>);
 
             return Tuple.Create(supred, disabling);
         }
 
-        public static IEnumerable<IEnumerable<T>> PowerSet<T>(List<T> list)
+        public static IEnumerable<T[]> PowerSet<T>(T[] seq, int min, int max)
         {
-            return from m in Enumerable.Range(0, 1 << list.Count)
-                   select
-                       from i in Enumerable.Range(0, list.Count)
-                       where (m & (1 << i)) != 0
-                       select list[i];
+            for (var i = min; i <= max; i++)
+            {
+                foreach (var c in Combinations(i, seq.Length))
+                    yield return c.Select(e => seq[e]).ToArray();
+            }
+        }
+
+        public static IEnumerable<int[]> Combinations(int m, int n)
+        {
+            var result = new int[m];
+            var stack = new Stack<int>();
+            stack.Push(0);
+
+            while (stack.Count > 0)
+            {
+                var index = stack.Count - 1;
+                var value = stack.Pop();
+
+                while (value < n)
+                {
+                    result[index++] = value++;
+                    stack.Push(value);
+                    if (index == m)
+                    {
+                        yield return result;
+                        break;
+                    }
+                }
+            }
         }
 
         private static bool IsConflicting(IEnumerable<DeterministicFiniteAutomaton> supervisors)
@@ -1151,8 +1304,8 @@ namespace UltraDES
             var composition = supervisors.AsParallel().Aggregate((a, b) => a.ParallelCompositionWith(b));
 
             var marked = composition._states.Select((s, i) => s.IsMarked ? i : -1)
-               .Where(s => s != -1)
-               .ToList();
+                .Where(s => s != -1)
+                .ToList();
 
             var visited = new BitArray(composition._states.Length, false);
             marked.ForEach(s => composition.InverseDepthFirstSearch(s, visited));
@@ -1160,86 +1313,14 @@ namespace UltraDES
             return visited.OfType<bool>().Any(b => !b);
         }
 
-        public IEnumerable<Transition> Transitions
-        {
-            get
-            {
-                for (int i = 0; i < _adjacency.Length; i++)
-                {
-                    var s1 = _states[i];
-                    foreach (var kvp in _adjacency[i])
-                    {
-                        var e = _events[kvp.Key];
-                        var s2 = _states[kvp.Value];
-
-                        yield return (new Transition(s1, e, s2));
-                    }
-                }
-            }
-        }
-
         public override string ToString()
         {
             return Name;
         }
 
-        public string ToXML
-        {
-            get
-            {
-                var doc = new XmlDocument();
-                var automaton = (XmlElement) doc.AppendChild(doc.CreateElement("Automaton"));
-                automaton.SetAttribute("Name", _name);
-
-                var states = (XmlElement) automaton.AppendChild(doc.CreateElement("States"));
-                for (int i = 0; i < _states.Length; i++)
-                {
-                    var state = _states[i];
-
-                    var s = ((XmlElement) states.AppendChild(doc.CreateElement("State")));
-                    s.SetAttribute("Name", state.ToString());
-                    s.SetAttribute("Marking", state.Marking.ToString());
-                    s.SetAttribute("Id", i.ToString());
-                }
-
-                var initial = (XmlElement) automaton.AppendChild(doc.CreateElement("InitialState"));
-                initial.SetAttribute("Id", _initial.ToString());
-
-                var events = (XmlElement) automaton.AppendChild(doc.CreateElement("Events"));
-                for (int i = 0; i < _events.Length; i++)
-                {
-                    var @event = _events[i];
-
-                    var e = ((XmlElement) events.AppendChild(doc.CreateElement("Event")));
-                    e.SetAttribute("Name", @event.ToString());
-                    e.SetAttribute("Controllability", @event.Controllability.ToString());
-                    e.SetAttribute("Id", i.ToString());
-                }
-
-                var transitions = (XmlElement) automaton.AppendChild(doc.CreateElement("Transitions"));
-                for (int i = 0; i < _states.Length; i++)
-                {
-                    for (int j = 0; j < _events.Length; j++)
-                    {
-                        var k =  _adjacency[i].ContainsKey(j) ? _adjacency[i][j] : -1;
-                        if (k == -1) continue;
-
-                        var t = (XmlElement) transitions.AppendChild(doc.CreateElement("Transition"));
-
-                        t.SetAttribute("Origin", i.ToString());
-                        t.SetAttribute("Trigger", j.ToString());
-                        t.SetAttribute("Destination", k.ToString());
-                    }
-                }
-
-                return doc.OuterXml;
-            }
-        }
-
         public void ToXMLFile(string filepath)
         {
-
-            XmlWriterSettings settings = new XmlWriterSettings
+            var settings = new XmlWriterSettings
             {
                 Indent = true,
                 IndentChars = ("\t"),
@@ -1249,12 +1330,11 @@ namespace UltraDES
 
             using (var writer = XmlWriter.Create(filepath, settings))
             {
-
                 writer.WriteStartElement("Automaton");
                 writer.WriteAttributeString("Name", _name);
 
                 writer.WriteStartElement("States");
-                for (int i = 0; i < _states.Length; i++)
+                for (var i = 0; i < _states.Length; i++)
                 {
                     var state = _states[i];
 
@@ -1274,7 +1354,7 @@ namespace UltraDES
                 writer.WriteEndElement();
 
                 writer.WriteStartElement("Events");
-                for (int i = 0; i < _events.Length; i++)
+                for (var i = 0; i < _events.Length; i++)
                 {
                     var @event = _events[i];
 
@@ -1289,9 +1369,9 @@ namespace UltraDES
                 writer.WriteEndElement();
 
                 writer.WriteStartElement("Transitions");
-                for (int i = 0; i < _states.Length; i++)
+                for (var i = 0; i < _states.Length; i++)
                 {
-                    for (int j = 0; j < _events.Length; j++)
+                    for (var j = 0; j < _events.Length; j++)
                     {
                         var k = _adjacency[i].ContainsKey(j) ? _adjacency[i][j] : -1;
                         if (k == -1) continue;
@@ -1312,7 +1392,7 @@ namespace UltraDES
 
         public static DeterministicFiniteAutomaton FromXMLFile(string filepath, bool stateName = true)
         {
-            XDocument xdoc = XDocument.Load(filepath);
+            var xdoc = XDocument.Load(filepath);
 
             var name = xdoc.Descendants("Automaton").Select(dfa => dfa.Attribute("Name").Value).Single();
             var states = xdoc.Descendants("State")
@@ -1395,22 +1475,74 @@ namespace UltraDES
             file.Close();
         }
 
+        public void ToAdsFile(string filepath, AbstractEvent[] eventSet, int odd = 1, int even = 2)
+        {
+            var events = new Dictionary<AbstractEvent, int>();
+            //int odd = 1, even = 2;
+
+            foreach (var e in eventSet)
+            {
+                if (!e.IsControllable)
+                {
+                    events.Add(e, even);
+                    even += 2;
+                }
+                else
+                {
+                    events.Add(e, odd);
+                    odd += 2;
+                }
+            }
+
+            var file = File.CreateText(filepath);
+
+            file.WriteLine("# UltraDES ADS FILE - LACSED | UFMG\r\n");
+
+            file.WriteLine("{0}\r\n", Name);
+
+            file.WriteLine("State size (State set will be (0,1....,size-1)):");
+            file.WriteLine("{0}\r\n", _states.Length);
+
+            file.WriteLine("Marker states:");
+            file.WriteLine("{0}\r\n",
+                _states.Select((s, i) => new { ss = s, ii = i })
+                    .Aggregate("", (a, b) => a + (b.ss.IsMarked ? b.ii.ToString() : "") + " ")
+                    .Trim());
+
+            file.WriteLine("Vocal states:\r\n");
+
+            file.WriteLine("Transitions:");
+
+            var map = _states.Select((s, i) => new { ss = s, ii = i }).ToDictionary(o => o.ss, o => o.ii);
+
+
+            map[_states[0]] = _initial;
+            map[_states[_initial]] = 0;
+
+            foreach (var t in Transitions)
+            {
+                file.WriteLine("{0} {1} {2}", map[t.Origin], events[t.Trigger], map[t.Destination]);
+            }
+
+            file.Close();
+        }
+
         public static DeterministicFiniteAutomaton FromAdsFile(string filepath)
         {
             var file = File.OpenText(filepath);
 
             var name = NextValidLine(file);
 
-            if(!NextValidLine(file).Contains("State size")) throw new Exception("File is not on ADS Format.");
+            if (!NextValidLine(file).Contains("State size")) throw new Exception("File is not on ADS Format.");
 
             var states = int.Parse(NextValidLine(file));
 
-            if(!NextValidLine(file).Contains("Marker states")) throw new Exception("File is not on ADS Format.");
+            if (!NextValidLine(file).Contains("Marker states")) throw new Exception("File is not on ADS Format.");
 
             var marked = string.Empty;
 
             var line = NextValidLine(file);
-            if(!line.Contains("Vocal states"))
+            if (!line.Contains("Vocal states"))
             {
                 marked = line;
                 line = NextValidLine(file);
@@ -1418,39 +1550,47 @@ namespace UltraDES
 
             AbstractState[] stateSet;
 
-            if(marked == "*")
+            if (marked == "*")
             {
-                stateSet = Enumerable.Range(0,states).Select(i=> new State(i.ToString(),Marking.Marked)).ToArray();
+                stateSet = Enumerable.Range(0, states).Select(i => new State(i.ToString(), Marking.Marked)).ToArray();
             }
-            else if(marked == string.Empty)
+            else if (marked == string.Empty)
             {
                 stateSet = Enumerable.Range(0, states).Select(i => new State(i.ToString(), Marking.Unmarked)).ToArray();
             }
             else
             {
-                var markedSet = marked.Split().Select(s=>int.Parse(s)).ToList();
-                stateSet = Enumerable.Range(0, states).Select(i => markedSet.Contains(i) ? new State(i.ToString(), Marking.Marked) : new State(i.ToString(), Marking.Unmarked)).ToArray();
+                var markedSet = marked.Split().Select(int.Parse).ToList();
+                stateSet =
+                    Enumerable.Range(0, states)
+                        .Select(
+                            i =>
+                                markedSet.Contains(i)
+                                    ? new State(i.ToString(), Marking.Marked)
+                                    : new State(i.ToString(), Marking.Unmarked))
+                        .ToArray();
             }
 
             if (!NextValidLine(file).Contains("Vocal states")) throw new Exception("File is not on ADS Format.");
 
             line = NextValidLine(file);
-            while(!line.Contains("Transitions")) line = NextValidLine(file);
+            while (!line.Contains("Transitions")) line = NextValidLine(file);
 
-            Dictionary<int,AbstractEvent> evs = new Dictionary<int,AbstractEvent>();
-            List<Transition> transitions = new List<Transition>();
+            var evs = new Dictionary<int, AbstractEvent>();
+            var transitions = new List<Transition>();
 
-            while(file.EndOfStream)
+            while (file.EndOfStream)
             {
                 line = NextValidLine(file);
-                if(line == string.Empty) continue;
+                if (line == string.Empty) continue;
 
-                var trans = line.Split().Select(s=>int.Parse(s)).ToArray();
+                var trans = line.Split().Select(int.Parse).ToArray();
 
-                if(!evs.ContainsKey(trans[1]))
+                if (!evs.ContainsKey(trans[1]))
                 {
-                    var e = new Event(trans[1].ToString(),trans[1]%2==0?Controllability.Uncontrollable:Controllability.Controllable);
-                    evs.Add(trans[1],e);
+                    var e = new Event(trans[1].ToString(),
+                        trans[1]%2 == 0 ? Controllability.Uncontrollable : Controllability.Controllable);
+                    evs.Add(trans[1], e);
                 }
 
                 transitions.Add(new Transition(stateSet[trans[0]], evs[trans[1]], stateSet[trans[2]]));
