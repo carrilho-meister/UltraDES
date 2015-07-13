@@ -220,7 +220,6 @@ namespace Reduced
             // Computing the local modular supervisors
             var timer = new Stopwatch();
             timer.Start();
-            List<DeterministicFiniteAutomaton> plants;
             var sups = DeterministicFiniteAutomaton.LocalModularReducedSupervisor(
                 new[] {c1, c2, milling, lathe, robot, mm, c3, mp}, // Plants
                 new[] {e1, e2, e3, e4, e5, e6, e7, e8}, // Specifications

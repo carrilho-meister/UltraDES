@@ -236,7 +236,7 @@ namespace Test
 
             // At TCT
             // 1) Convert ADS files to DES using FD command
-            // 2) Generete the disabling structure with command 7 (DAT1 = Condat(P1, S1))
+            // 2) Generate the disabling structure with command 7 (DAT1 = Condat(P1, S1))
             // 3) Generate the reduced supervisor using the command 8 (Sr1 = Supreduce(P1, S1, DAT1))
 
             Console.ReadLine();

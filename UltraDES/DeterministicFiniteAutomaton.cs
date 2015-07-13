@@ -1042,11 +1042,11 @@ namespace UltraDES
                 dic.AsParallel()
                     .AsOrdered()
                     .WithExecutionMode(ParallelExecutionMode.ForceParallelism)
-                    .Select(automata => MonoliticSupervisor(automata.Key, new[] {automata.Value}))
+                    .Select(automata => MonoliticSupervisor(automata.Key, new[] {automata.Value}, true))
                     .ToList();
 
             var ss = supervisors.ToList();
-            ss.AddRange(conflictResolvingSupervisor.Select(crs => MonoliticSupervisor(crs.Item1, crs.Item2)));
+            ss.AddRange(conflictResolvingSupervisor.Select(crs => MonoliticSupervisor(crs.Item1, crs.Item2, true)));
 
 
             if (IsConflicting(ss))
@@ -1242,16 +1242,17 @@ namespace UltraDES
                     .Distinct()
                     .ToList();
 
-            var transitions = (from X in Cn
-                let ev = X.Aggregate(new List<AbstractEvent>(), (a, b) => a.Union(E[b]).ToList())
-                from e in ev.Intersect(events.Union(disabled))
-                let dest =
-                    X.SelectMany(
-                        x =>
-                            supervisor.Transitions.Where(t => t.Origin == x && t.Trigger == e)
-                                .Select(t => t.Destination)).Distinct().ToList()
-                let X2 = Cn.SingleOrDefault(X1 => dest.TrueForAll(X1.Contains))
-                select new Transition(st[X], e, st[X2])).ToList();
+            var transitions = new List<Transition>();
+            foreach (var x1 in Cn)
+            {
+                List<AbstractEvent> ev = x1.Aggregate(new List<AbstractEvent>(), (a, b) => a.Union(E[b]).ToList());
+                foreach (var e in ev.Intersect(events.Union(disabled)))
+                {
+                    List<AbstractState> dest = x1.SelectMany(x => supervisor.Transitions.Where(t => t.Origin == x && t.Trigger == e).Select(t => t.Destination)).Distinct().ToList();
+                    HashSet<AbstractState> X2 = Cn.SingleOrDefault(X1 => dest.TrueForAll(X1.Contains));
+                    if (X2 != null) transitions.Add(new Transition(st[x1], e, st[X2]));
+                }
+            }
 
             var initial = st[Cn.First(X => X.Contains(supervisor.InitialState))];
 
