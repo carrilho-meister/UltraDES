@@ -215,7 +215,7 @@ namespace Test
                 s[0], "E4");
 
             // Computing the confict solving supervisor 
-            var s78 = DeterministicFiniteAutomaton.MonoliticSupervisor(new[] {c3, mp, mm, robot}, new[] {e7, e8}, true);
+            var e78 = e7.ParallelCompositionWith(e8);
 
             // Computing the local modular supervisors
             var timer = new Stopwatch();
@@ -223,9 +223,8 @@ namespace Test
             List<DeterministicFiniteAutomaton> plants;
             var sups = DeterministicFiniteAutomaton.LocalModularSupervisor(
                 new[] {c1, c2, milling, lathe, robot, mm, c3, mp}, // Plants
-                new[] {e1, e2, e3, e4, e5, e6, e7, e8}, // Specifications
-                out plants, // Modular Plants
-                new[] {s78}).ToArray(); // Confict Solver
+                new[] {e1, e2, e3, e4, e5, e6, e78}, // Specifications
+                out plants).ToArray(); // Modular Plant
             timer.Stop();
 
             Console.WriteLine("Computation Time: {0}", timer.ElapsedMilliseconds/1000.0);

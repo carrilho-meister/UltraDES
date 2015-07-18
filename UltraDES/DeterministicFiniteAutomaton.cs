@@ -1010,7 +1010,7 @@ namespace UltraDES
             var supervisors =
                 dic.AsParallel()
                     .WithExecutionMode(ParallelExecutionMode.ForceParallelism)
-                    .Select(automata => MonoliticSupervisor(new[]{automata.Key}, new[] { automata.Value }))
+                    .Select(automata => MonoliticSupervisor(new[]{automata.Key}, new[] { automata.Value }, true))
                     .ToList();
 
             var complete = supervisors.Union(conflictResolvingSupervisor).ToList();
