@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -15,6 +16,7 @@ namespace UltraDES
     using Some = Some<AbstractState>;
     using None = None<AbstractState>;
     using DesablingStructure = Dictionary<AbstractState, ISet<AbstractEvent>>;
+    using DFA = DeterministicFiniteAutomaton;
 
     [Serializable]
     public sealed class DeterministicFiniteAutomaton
@@ -47,6 +49,7 @@ namespace UltraDES
                             t => Tuple.Create(Array.IndexOf(_events, t.Trigger), Array.IndexOf(_states, t.Destination)))
                         .ToArray());
             }
+            Debug.WriteLine("{0} {1}", _name, this.MarkedStates.Count());
         }
 
         public DeterministicFiniteAutomaton(IEnumerable<Transition> transitions, AbstractEvent[] events,
@@ -80,6 +83,7 @@ namespace UltraDES
                         .Select(t => Tuple.Create(ei[t.Trigger], si[t.Destination]))
                         .ToArray());
             }
+            Debug.WriteLine("MSP {0}", this.MarkedStates.Count());
         }
 
         private DeterministicFiniteAutomaton(AbstractState[] states, AbstractEvent[] events, AdjacencyMatrix adjacency,
@@ -90,6 +94,8 @@ namespace UltraDES
             _name = name;
             _initial = initial;
             _adjacency = adjacency;
+
+            Debug.WriteLine("MSP {0}", this.MarkedStates.Count());
         }
 
         public DeterministicFiniteAutomaton AccessiblePart
@@ -710,7 +716,7 @@ namespace UltraDES
             var G1 = this;
 
             var events = G1._events.Union(G2._events).ToArray();
-            AbstractState[] states =
+            AbstractCompoundState[] states =
                 G1._states.AsParallel()
                     .AsOrdered()
                     .SelectMany(
@@ -803,7 +809,7 @@ namespace UltraDES
             var G1 = this;
 
             var events = G1._events.Intersect(G2._events).ToArray();
-            AbstractState[] states =
+            AbstractCompoundState[] states =
                 G1._states.AsParallel()
                     .AsOrdered()
                     .SelectMany(
@@ -857,14 +863,16 @@ namespace UltraDES
         {
             var plantTask =
                 Task.Factory.StartNew(
-                    () => plants.AsParallel().Aggregate((a, b) => a.ParallelCompositionWith(b)).CoaccessiblePart);
+                    () => plants.AsParallel().Aggregate((a, b) => a.ParallelCompositionWith(b)));
             var specificationTask =
                 Task.Factory.StartNew(
-                    () => specifications.AsParallel().Aggregate((a, b) => a.ParallelCompositionWith(b)).CoaccessiblePart);
+                    () => specifications.AsParallel().Aggregate((a, b) => a.ParallelCompositionWith(b)));
 
 
             var plant = plantTask.Result;
             var specification = specificationTask.Result;
+
+            
 
             GC.Collect();
             GC.Collect();

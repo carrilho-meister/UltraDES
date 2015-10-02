@@ -12,9 +12,9 @@ namespace UltraDES
             Trigger = trigger;
         }
 
-        public AbstractState Origin { get; protected set; }
-        public AbstractState Destination { get; protected set; }
-        public AbstractEvent Trigger { get; protected set; }
+        public AbstractState Origin { get; }
+        public AbstractState Destination { get; }
+        public AbstractEvent Trigger { get; }
         public bool IsControllableTransition { get { return Trigger.IsControllable; } }
 
         public override bool Equals(object obj)
