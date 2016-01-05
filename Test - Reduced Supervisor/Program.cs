@@ -12,18 +12,18 @@ using UltraDES;
 
 namespace Reduced
 {
-    class Program
+    internal class Program
     {
-        static void Main()
+        private static void Main()
         {
             // creating States (0 to 6)
             var s =
                 Enumerable.Range(0, 6)
                     .Select(i =>
-                            new State(i.ToString(),
-                                i == 0
-                                    ? Marking.Marked
-                                    : Marking.Unmarked)
+                        new State(i.ToString(),
+                            i == 0
+                                ? Marking.Marked
+                                : Marking.Unmarked)
                     ).ToArray();
 
             // Creating Events (0 to 100)
@@ -31,7 +31,7 @@ namespace Reduced
                 Enumerable.Range(0, 100)
                     .Select(i =>
                         new Event(i.ToString(),
-                            i % 2 != 0
+                            i%2 != 0
                                 ? Controllability.Controllable
                                 : Controllability.Uncontrollable)
                     ).ToArray();
@@ -215,7 +215,7 @@ namespace Reduced
                 s[0], "E4");
 
             // Computing the confict solving supervisor 
-            var s78 = DeterministicFiniteAutomaton.MonoliticSupervisor(new[] { c3, mp, mm, robot }, new[] { e7, e8 }, true);
+            var s78 = DeterministicFiniteAutomaton.MonoliticSupervisor(new[] {c3, mp, mm, robot}, new[] {e7, e8}, true);
 
             // Computing the local modular supervisors
             var timer = new Stopwatch();
@@ -231,7 +231,7 @@ namespace Reduced
                 }).ToArray();
             timer.Stop();
 
-            Console.WriteLine("Computation Time: {0}", timer.ElapsedMilliseconds / 1000.0);
+            Console.WriteLine("Computation Time: {0}", timer.ElapsedMilliseconds/1000.0);
 
             // Exporting to TCT
             sups[0].Item1.ToAdsFile("S1.ADS", e, 1, 0);

@@ -12,18 +12,18 @@ using UltraDES;
 
 namespace Test
 {
-    class Program
+    internal class Program
     {
-        static void Main()
+        private static void Main()
         {
             // creating States (0 to 6)
             var s =
                 Enumerable.Range(0, 6)
                     .Select(i =>
-                            new State(i.ToString(),
-                                i == 0
-                                    ? Marking.Marked
-                                    : Marking.Unmarked)
+                        new State(i.ToString(),
+                            i == 0
+                                ? Marking.Marked
+                                : Marking.Unmarked)
                     ).ToArray();
 
             // Creating Events (0 to 100)

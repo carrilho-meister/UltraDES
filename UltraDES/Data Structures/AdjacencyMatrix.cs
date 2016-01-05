@@ -15,13 +15,6 @@ namespace UltraDES
             _internal = new SortedList<int, int>[states];
         }
 
-        public void Add(int origin, Tuple<int, int>[] values)
-        {
-            _internal[origin] = new SortedList<int, int>(values.Length);
-            foreach (var value in values)
-                _internal[origin].Add(value.Item1, value.Item2);
-        }
-
         public int this[int s, int e]
         {
             get
@@ -39,6 +32,13 @@ namespace UltraDES
         public int Length
         {
             get { return _internal.Length; }
+        }
+
+        public void Add(int origin, Tuple<int, int>[] values)
+        {
+            _internal[origin] = new SortedList<int, int>(values.Length);
+            foreach (var value in values)
+                _internal[origin].Add(value.Item1, value.Item2);
         }
 
         public void TrimExcess()

@@ -5,7 +5,6 @@ namespace UltraDES
     [Serializable]
     public abstract class AbstractEvent : Symbol
     {
-
         public Controllability Controllability { get; protected set; }
 
         public bool IsControllable

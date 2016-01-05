@@ -12,7 +12,6 @@ namespace UltraDES
     [Serializable]
     public class Some<T> : Option<T>
     {
-
         private Some(T value)
         {
             Value = value;
@@ -28,7 +27,7 @@ namespace UltraDES
             get { return true; }
         }
 
-        public T Value { get; private set; }
+        public T Value { get; }
 
         public static Option<T> Create(T value)
         {

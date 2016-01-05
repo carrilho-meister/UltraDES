@@ -38,7 +38,7 @@ namespace UltraDES
 
         public override string ToString()
         {
-            return String.Format("{0}.{1}", _a, _b);
+            return string.Format("{0}.{1}", _a, _b);
         }
 
         public override bool Equals(object obj)
@@ -47,7 +47,7 @@ namespace UltraDES
             var concat1 = this;
             var concat2 = (Concatenation) obj;
 
-            return (concat1._a == concat2._a && concat1._b == concat2._b);
+            return concat1._a == concat2._a && concat1._b == concat2._b;
         }
     }
 }

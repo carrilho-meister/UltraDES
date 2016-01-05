@@ -1,4 +1,10 @@
-﻿using System;
+﻿////////////////////////////////////////////////////////////////////////////////////////////////////
+// file:	DeterministicFiniteAutomaton.cs
+//
+// summary:	Implements the deterministic finite automaton class
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -18,18 +24,37 @@ namespace UltraDES
     using DesablingStructure = Dictionary<AbstractState, ISet<AbstractEvent>>;
     using DFA = DeterministicFiniteAutomaton;
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     (Serializable)a deterministic finite automaton. This class cannot be inherited.
+    /// </summary>
+    /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
     [Serializable]
     public sealed class DeterministicFiniteAutomaton
     {
+        /// <summary>   The adjacency. </summary>
         private readonly AdjacencyMatrix _adjacency;
+
+        /// <summary>   The events. </summary>
         private readonly AbstractEvent[] _events;
+
+        /// <summary>   The initial. </summary>
         private readonly int _initial;
-        private readonly string _name;
+
+        /// <summary>   The states. </summary>
         private readonly AbstractState[] _states;
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Constructor. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="transitions">  The transitions. </param>
+        /// <param name="initial">      The initial. </param>
+        /// <param name="name">         The name. </param>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public DeterministicFiniteAutomaton(IEnumerable<Transition> transitions, AbstractState initial, string name)
         {
-            _name = name;
+            Name = name;
 
             var transitionsLocal = transitions as Transition[] ?? transitions.ToArray();
             _states = transitionsLocal.SelectMany(t => new[] {t.Origin, t.Destination}).Distinct().ToArray();
@@ -49,13 +74,21 @@ namespace UltraDES
                             t => Tuple.Create(Array.IndexOf(_events, t.Trigger), Array.IndexOf(_states, t.Destination)))
                         .ToArray());
             }
-            Debug.WriteLine("{0} {1}", _name, this.MarkedStates.Count());
+            Debug.WriteLine("{0} {1}", Name, MarkedStates.Count());
         }
 
-        public DeterministicFiniteAutomaton(IEnumerable<Transition> transitions, AbstractEvent[] events,
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Constructor. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="transitions">  The transitions. </param>
+        /// <param name="events">       The events. </param>
+        /// <param name="initial">      The initial. </param>
+        /// <param name="name">         The name. </param>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private DeterministicFiniteAutomaton(IEnumerable<Transition> transitions, AbstractEvent[] events,
             AbstractState initial, string name)
         {
-            _name = name;
+            Name = name;
 
             var transitionsLocal = transitions as Transition[] ?? transitions.ToArray();
             _states = transitionsLocal.SelectMany(t => new[] {t.Origin, t.Destination}).Distinct().ToArray();
@@ -83,22 +116,35 @@ namespace UltraDES
                         .Select(t => Tuple.Create(ei[t.Trigger], si[t.Destination]))
                         .ToArray());
             }
-            Debug.WriteLine("MSP {0}", this.MarkedStates.Count());
+            Debug.WriteLine("MSP {0}", MarkedStates.Count());
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Constructor. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="states">       [out] The states. </param>
+        /// <param name="events">       The events. </param>
+        /// <param name="adjacency">    The adjacency. </param>
+        /// <param name="initial">      The initial. </param>
+        /// <param name="name">         The name. </param>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         private DeterministicFiniteAutomaton(AbstractState[] states, AbstractEvent[] events, AdjacencyMatrix adjacency,
             int initial, string name)
         {
             _states = states;
             _events = events;
-            _name = name;
+            Name = name;
             _initial = initial;
             _adjacency = adjacency;
 
-            Debug.WriteLine("MSP {0}", this.MarkedStates.Count());
+            Debug.WriteLine("MSP {0}", MarkedStates.Count());
         }
 
-        public DeterministicFiniteAutomaton AccessiblePart
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Gets the accessible part. </summary>
+        /// <value> The accessible part. </value>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public DFA AccessiblePart
         {
             get
             {
@@ -111,12 +157,16 @@ namespace UltraDES
 
                 var initial = Array.IndexOf(states, _states[_initial]);
 
-                return new DeterministicFiniteAutomaton(states, _events, adjacency, initial,
-                    string.Format("Ac({0})", _name));
+                return new DFA(states, _events, adjacency, initial,
+                    string.Format("Ac({0})", Name));
             }
         }
 
-        public DeterministicFiniteAutomaton CoaccessiblePart
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Gets the coaccessible part. </summary>
+        /// <value> The coaccessible part. </value>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public DFA CoaccessiblePart
         {
             get
             {
@@ -132,28 +182,40 @@ namespace UltraDES
 
                 var initial = Array.IndexOf(states, _states[_initial]);
 
-                return new DeterministicFiniteAutomaton(states, _events, adjacency, initial,
-                    string.Format("Coac({0})", _name));
+                return new DFA(states, _events, adjacency, initial,
+                    string.Format("Coac({0})", Name));
             }
         }
 
-        public DeterministicFiniteAutomaton Trim
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Gets the trim. </summary>
+        /// <value> The trim. </value>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public DFA Trim
         {
             get { return AccessiblePart.CoaccessiblePart; }
         }
 
-        public DeterministicFiniteAutomaton PrefixClosure
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Gets the prefix closure. </summary>
+        /// <value> The prefix closure. </value>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public DFA PrefixClosure
         {
             get
             {
                 var states = _states.AsParallel().AsOrdered().Select(s => s.ToMarked).ToArray();
 
-                return new DeterministicFiniteAutomaton(states, _events, _adjacency, _initial,
+                return new DFA(states, _events, _adjacency, _initial,
                     string.Format("PrefixClosure({0})", Name));
             }
         }
 
-        public DeterministicFiniteAutomaton KleeneClosure
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Gets the kleene closure. </summary>
+        /// <value> The kleene closure. </value>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public DFA KleeneClosure
         {
             get
             {
@@ -177,7 +239,11 @@ namespace UltraDES
             }
         }
 
-        public DeterministicFiniteAutomaton Minimal
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Gets the minimal. </summary>
+        /// <value> The minimal. </value>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public DFA Minimal
         {
             get
             {
@@ -224,11 +290,15 @@ namespace UltraDES
                     return new Transition(s1, t.Trigger, s2);
                 }).Distinct();
 
-                return new DeterministicFiniteAutomaton(transitions,
+                return new DFA(transitions,
                     mapping.Single(m => m.Item1.Contains(InitialState)).Item2, string.Format("Min({0})", Name));
             }
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Gets to dot code. </summary>
+        /// <value> to dot code. </value>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public string ToDotCode
         {
             get
@@ -262,6 +332,10 @@ namespace UltraDES
             }
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Gets to regular expression. </summary>
+        /// <value> to regular expression. </value>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public RegularExpression ToRegularExpression
         {
             get
@@ -295,20 +369,16 @@ namespace UltraDES
                 for (var n = size - 1; n >= 0; n--)
                 {
                     b[n] = new KleeneStar(a[n, n])*b[n];
-                    //b[n] = b[n].Simplify;
                     for (var j = 0; j <= n; j++)
                     {
                         a[n, j] = new KleeneStar(a[n, n])*a[n, j];
-                        //a[n, j] = a[n, j].Simplify;
                     }
                     for (var i = 0; i <= n; i++)
                     {
                         b[i] += a[i, n]*b[n];
-                        //b[i] = b[i].Simplify;
                         for (var j = 0; j <= n; j++)
                         {
                             a[i, j] += a[i, n]*a[n, j];
-                            //a[i, j] = a[i, j].Simplify;
                         }
                     }
                 }
@@ -317,31 +387,52 @@ namespace UltraDES
             }
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Gets the states. </summary>
+        /// <value> The states. </value>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public IEnumerable<AbstractState> States
         {
             get { return new List<AbstractState>(_states); }
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Gets a list of states of the marked. </summary>
+        /// <value> The marked states. </value>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public IEnumerable<AbstractState> MarkedStates
         {
             get { return _states.AsParallel().Where(s => s.IsMarked); }
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Gets the events. </summary>
+        /// <value> The events. </value>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public IEnumerable<AbstractEvent> Events
         {
             get { return new List<AbstractEvent>(_events); }
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Gets the state of the initial. </summary>
+        /// <value> The initial state. </value>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public AbstractState InitialState
         {
             get { return _states[_initial]; }
         }
 
-        public string Name
-        {
-            get { return _name; }
-        }
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Gets the name. </summary>
+        /// <value> The name. </value>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public string Name { get; }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Gets the transition function. </summary>
+        /// <value> The transition function. </value>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public Func<AbstractState, AbstractEvent, Option<AbstractState>> TransitionFunction
         {
             get
@@ -354,14 +445,15 @@ namespace UltraDES
                     var i = si[s];
                     var k = Array.IndexOf(_events, e);
 
-                    if (_adjacency[i].ContainsKey(k))
-                        return Some.Create(_states[_adjacency[i][k]]);
-
-                    return None.Create();
+                    return _adjacency[i].ContainsKey(k) ? Some.Create(_states[_adjacency[i][k]]) : None.Create();
                 };
             }
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Gets the inverse transition function. </summary>
+        /// <value> The inverse transition function. </value>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public Func<AbstractState, AbstractEvent, AbstractState[]> InverseTransitionFunction
         {
             get
@@ -381,6 +473,10 @@ namespace UltraDES
             }
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Gets the transitions. </summary>
+        /// <value> The transitions. </value>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public IEnumerable<Transition> Transitions
         {
             get
@@ -393,26 +489,30 @@ namespace UltraDES
                         var e = _events[kvp.Key];
                         var s2 = _states[kvp.Value];
 
-                        yield return (new Transition(s1, e, s2));
+                        yield return new Transition(s1, e, s2);
                     }
                 }
             }
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Gets to XML. </summary>
+        /// <value> to XML. </value>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public string ToXML
         {
             get
             {
                 var doc = new XmlDocument();
                 var automaton = (XmlElement) doc.AppendChild(doc.CreateElement("Automaton"));
-                automaton.SetAttribute("Name", _name);
+                automaton.SetAttribute("Name", Name);
 
                 var states = (XmlElement) automaton.AppendChild(doc.CreateElement("States"));
                 for (var i = 0; i < _states.Length; i++)
                 {
                     var state = _states[i];
 
-                    var s = ((XmlElement) states.AppendChild(doc.CreateElement("State")));
+                    var s = (XmlElement) states.AppendChild(doc.CreateElement("State"));
                     s.SetAttribute("Name", state.ToString());
                     s.SetAttribute("Marking", state.Marking.ToString());
                     s.SetAttribute("Id", i.ToString());
@@ -426,7 +526,7 @@ namespace UltraDES
                 {
                     var @event = _events[i];
 
-                    var e = ((XmlElement) events.AppendChild(doc.CreateElement("Event")));
+                    var e = (XmlElement) events.AppendChild(doc.CreateElement("Event"));
                     e.SetAttribute("Name", @event.ToString());
                     e.SetAttribute("Controllability", @event.Controllability.ToString());
                     e.SetAttribute("Id", i.ToString());
@@ -452,50 +552,63 @@ namespace UltraDES
             }
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Depth first search. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="initial">  The initial. </param>
+        /// <param name="visited">  The visited. </param>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public void DepthFirstSearch(int initial, BitArray visited)
         {
             const int parallelThreshold = 100;
 
-            //if (visited.Length < parallelThreshold)
-            //{
-            //    var s = new Stack<int>();
-            //    s.Push(initial);
-
-            //    while (s.Count != 0)
-            //    {
-            //        var v = s.Pop();
-            //        if (visited[v]) continue;
-
-            //        visited[v] = true;
-
-            //        var neighbors = _adjacency[v].Values.Distinct().ToArray();
-
-            //        foreach (var destination in neighbors)
-            //            s.Push(destination);
-            //    }
-            //}
-            //else
-            //{
-            var frontier = new List<int> {initial};
-
-            while (frontier.Count != 0)
+            if (visited.Length < parallelThreshold)
             {
-                frontier.ForEach(st => visited[st] = true);
+                var s = new Stack<int>();
+                s.Push(initial);
 
-                if (frontier.Count > parallelThreshold/2)
-                    frontier = frontier.AsParallel()
-                        .SelectMany(v => _adjacency[v].Values)
-                        .Distinct()
-                        .Where(v => !visited[v]).ToList();
-                else
-                    frontier = frontier
-                        .SelectMany(v => _adjacency[v].Values)
-                        .Distinct()
-                        .Where(v => !visited[v]).ToList();
+                while (s.Count != 0)
+                {
+                    var v = s.Pop();
+                    if (visited[v]) continue;
+
+                    visited[v] = true;
+
+                    var neighbors = _adjacency[v].Values.Distinct().ToArray();
+
+                    foreach (var destination in neighbors)
+                        s.Push(destination);
+                }
             }
-            // }
+            else
+            {
+                var frontier = new List<int> {initial};
+
+                while (frontier.Count != 0)
+                {
+                    frontier.ForEach(st => visited[st] = true);
+
+                    if (frontier.Count > parallelThreshold/2)
+                        frontier = frontier.AsParallel()
+                            .SelectMany(v => _adjacency[v].Values)
+                            .Distinct()
+                            .Where(v => !visited[v]).ToList();
+                    else
+                        frontier = frontier
+                            .SelectMany(v => _adjacency[v].Values)
+                            .Distinct()
+                            .Where(v => !visited[v]).ToList();
+                }
+            }
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Inverse depth first search. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="initial">  The initial. </param>
+        /// <param name="states">   [out] The states. </param>
+        /// <param name="visited">  The visited. </param>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public void InverseDepthFirstSearch(int initial, BitArray states, BitArray visited)
         {
             const int parallelThreshold = 100;
@@ -524,6 +637,12 @@ namespace UltraDES
             }
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Inverse depth first search. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="initial">  The initial. </param>
+        /// <param name="visited">  The visited. </param>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public void InverseDepthFirstSearch(int initial, BitArray visited)
         {
             var s = new Stack<int>();
@@ -547,7 +666,16 @@ namespace UltraDES
             }
         }
 
-        private static AdjacencyMatrix RemoveStates(BitArray visited, DeterministicFiniteAutomaton G,
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Removes the states. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <exception cref="Exception">    Thrown when an exception error condition occurs. </exception>
+        /// <param name="visited">  The visited. </param>
+        /// <param name="G">        The DFA to process. </param>
+        /// <param name="states">   [out] The states. </param>
+        /// <returns>   An AdjacencyMatrix. </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private static AdjacencyMatrix RemoveStates(BitArray visited, DFA G,
             out AbstractState[] states)
         {
             const int parallelThreshold = 1000;
@@ -566,7 +694,7 @@ namespace UltraDES
                     var i = map2New[s];
                     for (var e = 0; e < G._events.Length; e++)
                     {
-                        var k = (G._adjacency[s].ContainsKey(e)) ? G._adjacency[s][e] : -1;
+                        var k = G._adjacency[s].ContainsKey(e) ? G._adjacency[s][e] : -1;
 
                         if (k == -1 || !map2New.ContainsKey(k)) continue;
 
@@ -583,7 +711,7 @@ namespace UltraDES
                     var i = map2New[s];
                     for (var e = 0; e < G._events.Length; e++)
                     {
-                        var k = (G._adjacency[s].ContainsKey(e)) ? G._adjacency[s][e] : -1;
+                        var k = G._adjacency[s].ContainsKey(e) ? G._adjacency[s][e] : -1;
 
                         if (k == -1 || !map2New.ContainsKey(k)) continue;
 
@@ -600,21 +728,30 @@ namespace UltraDES
             return adjacency;
         }
 
-        public DeterministicFiniteAutomaton Projection(IEnumerable<Event> removeEvents)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Projections the given remove events. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="removeEvents"> The events to be removed. </param>
+        /// <returns>   A DFA. </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public DFA Projection(IEnumerable<Event> removeEvents)
         {
             var evs = new HashSet<Event>(removeEvents);
 
-            var transitions = Transitions.Select(t =>
-            {
-                if (!evs.Contains(t.Trigger)) return t;
-
-                return new Transition(t.Origin, Epsilon.EpsilonEvent, t.Destination);
-            });
+            var transitions =
+                Transitions.Select(
+                    t => !evs.Contains(t.Trigger) ? t : new Transition(t.Origin, Epsilon.EpsilonEvent, t.Destination));
 
             return Determinize(transitions, InitialState, string.Format("Projection({0})", Name));
         }
 
-        public DeterministicFiniteAutomaton InverseProjection(IEnumerable<Event> events)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Inverse projection. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="events">   The events. </param>
+        /// <returns>   A DFA. </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public DFA InverseProjection(IEnumerable<Event> events)
         {
             var evs = events.Except(Events).ToList();
 
@@ -625,7 +762,15 @@ namespace UltraDES
             return Determinize(transitions, InitialState, string.Format("InvProjection({0})", Name));
         }
 
-        public static DeterministicFiniteAutomaton Determinize(IEnumerable<Transition> transitions,
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Determinizes. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="transitions">  The transitions. </param>
+        /// <param name="initial">      The initial. </param>
+        /// <param name="name">         The name. </param>
+        /// <returns>   A DFA. </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public static DFA Determinize(IEnumerable<Transition> transitions,
             AbstractState initial, string name)
         {
             var visited = new HashSet<AbstractState>();
@@ -684,9 +829,16 @@ namespace UltraDES
                     .ThenBy(s => s.Marking)
                     .Aggregate((a, b) => a.MergeWith(b, 0, false));
 
-            return new DeterministicFiniteAutomaton(newTransitions, newInitial, string.Format("Det({0})", name));
+            return new DFA(newTransitions, newInitial, string.Format("Det({0})", name));
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Epsilon jumps. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="transitions">  The transitions. </param>
+        /// <param name="initial">      The initial. </param>
+        /// <returns>   A HashSet&lt;AbstractState&gt; </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         private static HashSet<AbstractState> EpsilonJumps(Transition[] transitions, AbstractState initial)
         {
             var accessible = new HashSet<AbstractState>();
@@ -710,13 +862,20 @@ namespace UltraDES
             return accessible;
         }
 
-        public DeterministicFiniteAutomaton ParallelCompositionWith(DeterministicFiniteAutomaton G2)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Parallel composition with. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <exception cref="Exception">    Thrown when an exception error condition occurs. </exception>
+        /// <param name="G2">   The second DFA. </param>
+        /// <returns>   A DFA. </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public DFA ParallelCompositionWith(DFA G2)
         {
             const int parallelThreshold = 1000;
             var G1 = this;
 
             var events = G1._events.Union(G2._events).ToArray();
-            AbstractCompoundState[] states =
+            var states =
                 G1._states.AsParallel()
                     .AsOrdered()
                     .SelectMany(
@@ -734,7 +893,6 @@ namespace UltraDES
             {
                 Parallel.For(0, G1._states.Length, s1 =>
                 {
-                    //for (var s2 = 0; s2 < G2._states.Length; s2++)
                     Parallel.For(0, G2._states.Length, s2 =>
                     {
                         for (var e = 0; e < events.Length; e++)
@@ -743,13 +901,13 @@ namespace UltraDES
 
                             var dest1 = events2G1[e] == -1
                                 ? s1
-                                : (G1._adjacency[s1].ContainsKey(events2G1[e]))
+                                : G1._adjacency[s1].ContainsKey(events2G1[e])
                                     ? G1._adjacency[s1][events2G1[e]]
                                     : -1;
 
                             var dest2 = events2G2[e] == -1
                                 ? s2
-                                : (G2._adjacency[s2].ContainsKey(events2G2[e]))
+                                : G2._adjacency[s2].ContainsKey(events2G2[e])
                                     ? G2._adjacency[s2][events2G2[e]]
                                     : -1;
 
@@ -775,13 +933,13 @@ namespace UltraDES
 
                             var dest1 = events2G1[e] == -1
                                 ? s1
-                                : (G1._adjacency[s1].ContainsKey(events2G1[e]))
+                                : G1._adjacency[s1].ContainsKey(events2G1[e])
                                     ? G1._adjacency[s1][events2G1[e]]
                                     : -1;
 
                             var dest2 = events2G2[e] == -1
                                 ? s2
-                                : (G2._adjacency[s2].ContainsKey(events2G2[e]))
+                                : G2._adjacency[s2].ContainsKey(events2G2[e])
                                     ? G2._adjacency[s2][events2G2[e]]
                                     : -1;
 
@@ -800,16 +958,23 @@ namespace UltraDES
 
             adjacency.TrimExcess();
 
-            return new DeterministicFiniteAutomaton(states, events, adjacency, initial,
-                string.Format("{0}||{1}", G1._name, G2._name)).AccessiblePart;
+            return new DFA(states, events, adjacency, initial,
+                string.Format("{0}||{1}", G1.Name, G2.Name)).AccessiblePart;
         }
 
-        public DeterministicFiniteAutomaton ProductWith(DeterministicFiniteAutomaton G2)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Product with. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <exception cref="Exception">    Thrown when an exception error condition occurs. </exception>
+        /// <param name="G2">   The second DFA. </param>
+        /// <returns>   A DFA. </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public DFA ProductWith(DFA G2)
         {
             var G1 = this;
 
             var events = G1._events.Intersect(G2._events).ToArray();
-            AbstractCompoundState[] states =
+            var states =
                 G1._states.AsParallel()
                     .AsOrdered()
                     .SelectMany(
@@ -832,11 +997,11 @@ namespace UltraDES
                     {
                         var origin = s1*G2._states.Length + s2;
 
-                        var dest1 = (G1._adjacency[s1].ContainsKey(events2G1[e]))
+                        var dest1 = G1._adjacency[s1].ContainsKey(events2G1[e])
                             ? G1._adjacency[s1][events2G1[e]]
                             : -1;
 
-                        var dest2 = (G2._adjacency[s2].ContainsKey(events2G2[e]))
+                        var dest2 = G2._adjacency[s2].ContainsKey(events2G2[e])
                             ? G2._adjacency[s2][events2G2[e]]
                             : -1;
 
@@ -854,12 +1019,34 @@ namespace UltraDES
 
             adjacency.TrimExcess();
 
-            return new DeterministicFiniteAutomaton(states, events, adjacency, initial,
-                string.Format("{0}||{1}", G1._name, G2._name)).AccessiblePart;
+            return new DFA(states, events, adjacency, initial,
+                string.Format("{0}||{1}", G1.Name, G2.Name)).AccessiblePart;
         }
 
-        public static DeterministicFiniteAutomaton MonoliticSupervisor(IEnumerable<DeterministicFiniteAutomaton> plants,
-            IEnumerable<DeterministicFiniteAutomaton> specifications, bool nonBlocking = false)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Monolitic supervisor. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="plants">           The plants. </param>
+        /// <param name="specifications">   The specifications. </param>
+        /// <param name="nonBlocking">      true to non blocking. </param>
+        /// <returns>   A DFA. </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public static DFA MonoliticSupervisor(IEnumerable<DFA> plants,
+            IEnumerable<DFA> specifications, bool nonBlocking = false)
+        {
+            return MonolithicSupervisor(plants, specifications, nonBlocking);
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Monolithic supervisor. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="plants">           The plants. </param>
+        /// <param name="specifications">   The specifications. </param>
+        /// <param name="nonBlocking">      true to non blocking. </param>
+        /// <returns>   A DFA. </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public static DFA MonolithicSupervisor(IEnumerable<DFA> plants,
+            IEnumerable<DFA> specifications, bool nonBlocking = false)
         {
             var plantTask =
                 Task.Factory.StartNew(
@@ -872,7 +1059,6 @@ namespace UltraDES
             var plant = plantTask.Result;
             var specification = specificationTask.Result;
 
-            
 
             GC.Collect();
             GC.Collect();
@@ -912,11 +1098,19 @@ namespace UltraDES
             var initial = Array.IndexOf(states, result._states[result._initial]);
 
             return
-                new DeterministicFiniteAutomaton(states, result._events, adjacency, initial,
+                new DFA(states, result._events, adjacency, initial,
                     string.Format("Sup({0})", result.Name));
         }
 
-        private static bool VerifyNonblocking(DeterministicFiniteAutomaton result, List<int> marked, BitArray allowed)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Verify nonblocking. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="result">   The result. </param>
+        /// <param name="marked">   The marked. </param>
+        /// <param name="allowed">  The allowed. </param>
+        /// <returns>   true if it succeeds, false if it fails. </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private static bool VerifyNonblocking(DFA result, List<int> marked, BitArray allowed)
         {
             var visited = new BitArray(result._states.Length, false);
             marked.ForEach(s => result.InverseDepthFirstSearch(s, allowed, visited));
@@ -925,8 +1119,17 @@ namespace UltraDES
             return Enumerable.Range(0, visited.Length).Any(i => allowed[i] && !visited[i]);
         }
 
-        private static bool VerifyControlabillity(DeterministicFiniteAutomaton result,
-            DeterministicFiniteAutomaton plant,
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Verify controlabillity. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="result">       The result. </param>
+        /// <param name="plant">        The plant. </param>
+        /// <param name="result2Plant"> The result 2 plant. </param>
+        /// <param name="allowed">      The allowed. </param>
+        /// <returns>   true if it succeeds, false if it fails. </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private static bool VerifyControlabillity(DFA result,
+            DFA plant,
             IReadOnlyList<int> result2Plant, BitArray allowed)
         {
             var change = false;
@@ -976,12 +1179,24 @@ namespace UltraDES
         //    return supervisors;
         //}
 
-        public static IEnumerable<DeterministicFiniteAutomaton> LocalModularSupervisor(
-            IEnumerable<DeterministicFiniteAutomaton> plants,
-            IEnumerable<DeterministicFiniteAutomaton> specifications,
-            IEnumerable<DeterministicFiniteAutomaton> conflictResolvingSupervisor = null)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Enumerates local modular supervisor in this collection. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <exception cref="Exception">    Thrown when there is conflict. </exception>
+        /// <param name="plants">                       The plants. </param>
+        /// <param name="specifications">               The specifications. </param>
+        /// <param name="conflictResolvingSupervisor">  The conflict resolving supervisor. </param>
+        /// <returns>
+        ///     An enumerator that allows foreach to be used to process local modular supervisor in this
+        ///     collection.
+        /// </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public static IEnumerable<DFA> LocalModularSupervisor(
+            IEnumerable<DFA> plants,
+            IEnumerable<DFA> specifications,
+            IEnumerable<DFA> conflictResolvingSupervisor = null)
         {
-            if (conflictResolvingSupervisor == null) conflictResolvingSupervisor = new DeterministicFiniteAutomaton[0];
+            if (conflictResolvingSupervisor == null) conflictResolvingSupervisor = new DFA[0];
 
             var dic =
                 specifications.ToDictionary(
@@ -1003,22 +1218,41 @@ namespace UltraDES
             return complete;
         }
 
-        public static IEnumerable<DeterministicFiniteAutomaton> LocalModularSupervisor(
-            IEnumerable<DeterministicFiniteAutomaton> plants,
-            IEnumerable<DeterministicFiniteAutomaton> specifications,
-            out List<DeterministicFiniteAutomaton> compoundPlants,
-            IEnumerable<DeterministicFiniteAutomaton> conflictResolvingSupervisor = null)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Enumerates local modular supervisor in this collection. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <exception cref="Exception">    Thrown when an exception when there is conflict. </exception>
+        /// <param name="plants">                       The plants. </param>
+        /// <param name="specifications">               The specifications. </param>
+        /// <param name="compoundPlants">               [out] The compound plants. </param>
+        /// <param name="conflictResolvingSupervisor">  The conflict resolving supervisor. </param>
+        /// <returns>
+        ///     An enumerator that allows foreach to be used to process local modular supervisor in this
+        ///     collection.
+        /// </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public static IEnumerable<DFA> LocalModularSupervisor(
+            IEnumerable<DFA> plants,
+            IEnumerable<DFA> specifications,
+            out List<DFA> compoundPlants,
+            IEnumerable<DFA> conflictResolvingSupervisor = null)
         {
-            if (conflictResolvingSupervisor == null) conflictResolvingSupervisor = new DeterministicFiniteAutomaton[0];
+            if (conflictResolvingSupervisor == null) conflictResolvingSupervisor = new DFA[0];
 
             var dic =
                 specifications.ToDictionary(
-                    e => { return plants.Where(p => p._events.Intersect(e._events).Any()).Aggregate((a, b) => a.ParallelCompositionWith(b)).CoaccessiblePart; });
+                    e =>
+                    {
+                        return
+                            plants.Where(p => p._events.Intersect(e._events).Any())
+                                .Aggregate((a, b) => a.ParallelCompositionWith(b))
+                                .CoaccessiblePart;
+                    });
 
             var supervisors =
                 dic.AsParallel()
                     .WithExecutionMode(ParallelExecutionMode.ForceParallelism)
-                    .Select(automata => MonoliticSupervisor(new[]{automata.Key}, new[] { automata.Value }, true))
+                    .Select(automata => MonoliticSupervisor(new[] {automata.Key}, new[] {automata.Value}, true))
                     .ToList();
 
             var complete = supervisors.Union(conflictResolvingSupervisor).ToList();
@@ -1033,16 +1267,28 @@ namespace UltraDES
             return complete;
         }
 
-        public static IEnumerable<Tuple<DeterministicFiniteAutomaton, DesablingStructure>> LocalModularReducedSupervisor
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Enumerates local modular reduced supervisor in this collection. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <exception cref="Exception">    Thrown when an exception error condition occurs. </exception>
+        /// <param name="plants">                       The plants. </param>
+        /// <param name="specifications">               The specifications. </param>
+        /// <param name="conflictResolvingSupervisor">  The conflict resolving supervisor. </param>
+        /// <returns>
+        ///     An enumerator that allows foreach to be used to process local modular reduced supervisor
+        ///     in this collection.
+        /// </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public static IEnumerable<Tuple<DFA, DesablingStructure>> LocalModularReducedSupervisor
             (
-            IEnumerable<DeterministicFiniteAutomaton> plants,
-            IEnumerable<DeterministicFiniteAutomaton> specifications,
-            IEnumerable<Tuple<IEnumerable<DeterministicFiniteAutomaton>,
-                IEnumerable<DeterministicFiniteAutomaton>>> conflictResolvingSupervisor = null)
+            IEnumerable<DFA> plants,
+            IEnumerable<DFA> specifications,
+            IEnumerable<Tuple<IEnumerable<DFA>,
+                IEnumerable<DFA>>> conflictResolvingSupervisor = null)
         {
             if (conflictResolvingSupervisor == null)
-                conflictResolvingSupervisor = new List<Tuple<IEnumerable<DeterministicFiniteAutomaton>,
-                    IEnumerable<DeterministicFiniteAutomaton>>>();
+                conflictResolvingSupervisor = new List<Tuple<IEnumerable<DFA>,
+                    IEnumerable<DFA>>>();
 
             var dic = specifications.ToDictionary(e => plants.Where(p => p._events.Intersect(e._events).Any()).ToArray());
 
@@ -1074,9 +1320,16 @@ namespace UltraDES
             return pp.AsParallel().AsOrdered().Select((t, i) => ReduceSupervisor(t, ss[i], ee[i]._events)).ToList();
         }
 
-        public static Tuple<DeterministicFiniteAutomaton, DesablingStructure>
-            ReduceSupervisor(DeterministicFiniteAutomaton plant, DeterministicFiniteAutomaton supervisor,
-                IEnumerable<AbstractEvent> events)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Reduce supervisor. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="plant">        The plant. </param>
+        /// <param name="supervisor">   The supervisor. </param>
+        /// <param name="events">       The events. </param>
+        /// <returns>   A Tuple&lt;DFA,DesablingStructure&gt; </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public static Tuple<DFA, DesablingStructure> ReduceSupervisor(DFA plant, DFA supervisor,
+            IEnumerable<AbstractEvent> events)
         {
             var states = supervisor._states;
 
@@ -1181,11 +1434,8 @@ namespace UltraDES
                 }
             }
 
-            foreach (var kvp in R.ToList())
-            {
-                if ((kvp.Value != null && kvp.Value.Any()) || kvp.Value == null)
-                    R.Remove(kvp.Key);
-            }
+            foreach (var kvp in R.ToList().Where(kvp => (kvp.Value != null && kvp.Value.Any()) || kvp.Value == null))
+                R.Remove(kvp.Key);
 
             var C = new List<HashSet<HashSet<AbstractState>>>
             {
@@ -1200,23 +1450,18 @@ namespace UltraDES
                 flag = true;
                 foreach (var Ci in C[n - 1])
                 {
-                    foreach (var x1 in states)
+                    foreach (var x1 in states.Where(x1 => Ci.All(x2 =>
+                        (R.ContainsKey(Tuple.Create(x1, x2)) && !R[Tuple.Create(x1, x2)].Any()) ||
+                        (R.ContainsKey(Tuple.Create(x2, x1)) && !R[Tuple.Create(x2, x1)].Any())
+                        )))
                     {
-                        if (!Ci.All(x2 =>
-                            (R.ContainsKey(Tuple.Create(x1, x2)) && !R[Tuple.Create(x1, x2)].Any()) ||
-                            (R.ContainsKey(Tuple.Create(x2, x1)) && !R[Tuple.Create(x2, x1)].Any())
-                            )) continue;
-
-
                         if (C.Count < n + 1) C.Add(new HashSet<HashSet<AbstractState>>());
 
                         var aux = new HashSet<AbstractState>(Ci) {x1};
 
-                        if (!C[n].Any(Cj => Cj.SetEquals(aux)))
-                        {
-                            C[n].Add(aux);
-                            flag = false;
-                        }
+                        if (C[n].Any(Cj => Cj.SetEquals(aux))) continue;
+                        C[n].Add(aux);
+                        flag = false;
                     }
                 }
 
@@ -1250,22 +1495,20 @@ namespace UltraDES
                     .Distinct()
                     .ToList();
 
-            var transitions = new List<Transition>();
-            foreach (var x1 in Cn)
-            {
-                List<AbstractEvent> ev = x1.Aggregate(new List<AbstractEvent>(), (a, b) => a.Union(E[b]).ToList());
-                foreach (var e in ev.Intersect(events.Union(disabled)))
-                {
-                    List<AbstractState> dest = x1.SelectMany(x => supervisor.Transitions.Where(t => t.Origin == x && t.Trigger == e).Select(t => t.Destination)).Distinct().ToList();
-                    HashSet<AbstractState> X2 = Cn.SingleOrDefault(X1 => dest.TrueForAll(X1.Contains));
-                    if (X2 != null) transitions.Add(new Transition(st[x1], e, st[X2]));
-                }
-            }
+            var transitions = (from x1 in Cn
+                let ev = x1.Aggregate(new List<AbstractEvent>(), (a, b) => a.Union(E[b]).ToList())
+                from e in ev.Intersect(events.Union(disabled))
+                let dest =
+                    x1.SelectMany(x => supervisor.Transitions.Where(t => t.Origin == x && t.Trigger == e)
+                        .Select(t => t.Destination)).Distinct().ToList()
+                let X2 = Cn.SingleOrDefault(X1 => dest.TrueForAll(X1.Contains))
+                where X2 != null
+                select new Transition(st[x1], e, st[X2])).ToList();
 
             var initial = st[Cn.First(X => X.Contains(supervisor.InitialState))];
 
-            var supred = new DeterministicFiniteAutomaton(transitions, initial,
-                string.Format("SupRed({0})", supervisor._name)).Trim;
+            var supred = new DFA(transitions, initial,
+                string.Format("SupRed({0})", supervisor.Name)).Trim;
 
             var disabling = Cn.ToDictionary(X => st[X],
                 X =>
@@ -1275,6 +1518,17 @@ namespace UltraDES
             return Tuple.Create(supred, disabling);
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Enumerates power set in this collection. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <typeparam name="T">    Generic type parameter. </typeparam>
+        /// <param name="seq">  The sequence. </param>
+        /// <param name="min">  The minimum. </param>
+        /// <param name="max">  The maximum. </param>
+        /// <returns>
+        ///     An enumerator that allows foreach to be used to process power set in this collection.
+        /// </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public static IEnumerable<T[]> PowerSet<T>(T[] seq, int min, int max)
         {
             for (var i = min; i <= max; i++)
@@ -1284,6 +1538,15 @@ namespace UltraDES
             }
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Enumerates combinations in this collection. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="m">    The int to process. </param>
+        /// <param name="n">    The int to process. </param>
+        /// <returns>
+        ///     An enumerator that allows foreach to be used to process combinations in this collection.
+        /// </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public static IEnumerable<int[]> Combinations(int m, int n)
         {
             var result = new int[m];
@@ -1308,7 +1571,13 @@ namespace UltraDES
             }
         }
 
-        private static bool IsConflicting(IEnumerable<DeterministicFiniteAutomaton> supervisors)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Query if 'supervisors' is conflicting. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="supervisors">  The supervisors. </param>
+        /// <returns>   true if conflicting, false if not. </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private static bool IsConflicting(IEnumerable<DFA> supervisors)
         {
             var composition = supervisors.AsParallel().Aggregate((a, b) => a.ParallelCompositionWith(b));
 
@@ -1322,17 +1591,27 @@ namespace UltraDES
             return visited.OfType<bool>().Any(b => !b);
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Returns a string that represents the current object. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <returns>   A string that represents the current object. </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public override string ToString()
         {
             return Name;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Converts an automaton to an XML file. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="filepath"> The filepath. </param>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public void ToXMLFile(string filepath)
         {
             var settings = new XmlWriterSettings
             {
                 Indent = true,
-                IndentChars = ("\t"),
+                IndentChars = "\t",
                 NewLineChars = "\r\n",
                 Async = true
             };
@@ -1340,7 +1619,7 @@ namespace UltraDES
             using (var writer = XmlWriter.Create(filepath, settings))
             {
                 writer.WriteStartElement("Automaton");
-                writer.WriteAttributeString("Name", _name);
+                writer.WriteAttributeString("Name", Name);
 
                 writer.WriteStartElement("States");
                 for (var i = 0; i < _states.Length; i++)
@@ -1399,7 +1678,14 @@ namespace UltraDES
             }
         }
 
-        public static DeterministicFiniteAutomaton FromXMLFile(string filepath, bool stateName = true)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Generates an automaton from XML file. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="filepath">     The filepath. </param>
+        /// <param name="stateName">    true to state name. </param>
+        /// <returns>   A DFA. </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public static DFA FromXMLFile(string filepath, bool stateName = true)
         {
             var xdoc = XDocument.Load(filepath);
 
@@ -1427,15 +1713,21 @@ namespace UltraDES
                             new Transition(states[t.Attribute("Origin").Value], events[t.Attribute("Trigger").Value],
                                 states[t.Attribute("Destination").Value]));
 
-            return new DeterministicFiniteAutomaton(transitions, events.Values.OfType<AbstractEvent>().ToArray(),
+            return new DFA(transitions, events.Values.OfType<AbstractEvent>().ToArray(),
                 initial,
                 name);
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Converts this object to the ads file. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="filepath"> The filepath. </param>
+        /// <param name="odd">      The odd. </param>
+        /// <param name="even">     The even. </param>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public void ToAdsFile(string filepath, int odd = 1, int even = 2)
         {
             var events = new Dictionary<AbstractEvent, int>();
-            //int odd = 1, even = 2;
 
             foreach (var e in _events)
             {
@@ -1484,6 +1776,14 @@ namespace UltraDES
             file.Close();
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Converts this object to the ads file. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="filepath"> The filepath. </param>
+        /// <param name="eventSet"> Set the event belongs to. </param>
+        /// <param name="odd">      The odd. </param>
+        /// <param name="even">     The even. </param>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public void ToAdsFile(string filepath, AbstractEvent[] eventSet, int odd = 1, int even = 2)
         {
             var events = new Dictionary<AbstractEvent, int>();
@@ -1514,7 +1814,7 @@ namespace UltraDES
 
             file.WriteLine("Marker states:");
             file.WriteLine("{0}\r\n",
-                _states.Select((s, i) => new { ss = s, ii = i })
+                _states.Select((s, i) => new {ss = s, ii = i})
                     .Aggregate("", (a, b) => a + (b.ss.IsMarked ? b.ii.ToString() : "") + " ")
                     .Trim());
 
@@ -1522,7 +1822,7 @@ namespace UltraDES
 
             file.WriteLine("Transitions:");
 
-            var map = _states.Select((s, i) => new { ss = s, ii = i }).ToDictionary(o => o.ss, o => o.ii);
+            var map = _states.Select((s, i) => new {ss = s, ii = i}).ToDictionary(o => o.ss, o => o.ii);
 
 
             map[_states[0]] = _initial;
@@ -1536,7 +1836,14 @@ namespace UltraDES
             file.Close();
         }
 
-        public static DeterministicFiniteAutomaton FromAdsFile(string filepath)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Initializes this object from the given from ads file. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <exception cref="Exception">    Thrown when an exception error condition occurs. </exception>
+        /// <param name="filepath"> The filepath. </param>
+        /// <returns>   A DFA. </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public static DFA FromAdsFile(string filepath)
         {
             var file = File.OpenText(filepath);
 
@@ -1605,9 +1912,14 @@ namespace UltraDES
                 transitions.Add(new Transition(stateSet[trans[0]], evs[trans[1]], stateSet[trans[2]]));
             }
 
-            return new DeterministicFiniteAutomaton(transitions, stateSet[0], name);
+            return new DFA(transitions, stateSet[0], name);
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Serialize automaton. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="filepath"> The filepath. </param>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         public void SerializeAutomaton(string filepath)
         {
             IFormatter formatter = new BinaryFormatter();
@@ -1616,15 +1928,27 @@ namespace UltraDES
             stream.Close();
         }
 
-        public static DeterministicFiniteAutomaton DeserializeAutomaton(string filepath)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Deserialize automaton. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="filepath"> The filepath. </param>
+        /// <returns>   A DFA. </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public static DFA DeserializeAutomaton(string filepath)
         {
             IFormatter formatter = new BinaryFormatter();
             Stream stream = new FileStream(filepath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            var obj = (DeterministicFiniteAutomaton) formatter.Deserialize(stream);
+            var obj = (DFA) formatter.Deserialize(stream);
             stream.Close();
             return obj;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>   Next valid line. </summary>
+        /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
+        /// <param name="file"> The file. </param>
+        /// <returns>   A string. </returns>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         private static string NextValidLine(StreamReader file)
         {
             var line = string.Empty;

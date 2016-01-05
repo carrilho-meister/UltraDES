@@ -14,7 +14,7 @@ namespace UltraDES
             _hashcode = Alias.GetHashCode();
         }
 
-        public string Alias { get; private set; }
+        public string Alias { get; }
 
         public override bool Equals(object obj)
         {
@@ -22,7 +22,7 @@ namespace UltraDES
 
             // If parameter cannot be cast to Point return false.
             var p = obj as Event;
-            if ((Object) p == null) return false;
+            if ((object) p == null) return false;
 
             // Return true if the fields match:
             return Alias == p.Alias && Controllability == p.Controllability;

@@ -9,20 +9,20 @@ using System.Diagnostics;
 using System.Linq;
 using UltraDES;
 
-namespace Monolitic
+namespace Monolithic
 {
-    class Program
+    internal class Program
     {
-        static void Main()
+        private static void Main()
         {
             // creating States (0 to 6)
             var s =
                 Enumerable.Range(0, 6)
                     .Select(i =>
-                            new State(i.ToString(),
-                                i == 0
-                                    ? Marking.Marked
-                                    : Marking.Unmarked)
+                        new State(i.ToString(),
+                            i == 0
+                                ? Marking.Marked
+                                : Marking.Unmarked)
                     ).ToArray();
 
             // Creating Events (0 to 100)
@@ -30,7 +30,7 @@ namespace Monolitic
                 Enumerable.Range(0, 100)
                     .Select(i =>
                         new Event(i.ToString(),
-                            i % 2 != 0
+                            i%2 != 0
                                 ? Controllability.Controllable
                                 : Controllability.Uncontrollable)
                     ).ToArray();
@@ -221,7 +221,7 @@ namespace Monolitic
                 new[] {e1, e2, e3, e4, e5, e6, e7, e8}, true);
             timer.Stop();
 
-            Console.WriteLine("Computation Time: {0}", timer.ElapsedMilliseconds / 1000.0);
+            Console.WriteLine("Computation Time: {0}", timer.ElapsedMilliseconds/1000.0);
 
             // Exporting to TCT
             sup.ToXMLFile("S.xml");

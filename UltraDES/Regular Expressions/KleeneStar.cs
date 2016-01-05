@@ -29,7 +29,7 @@ namespace UltraDES
 
         public override string ToString()
         {
-            return String.Format("({0})*", _a);
+            return string.Format("({0})*", _a);
         }
 
         public override bool Equals(object obj)

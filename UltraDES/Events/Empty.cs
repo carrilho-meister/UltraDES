@@ -5,13 +5,12 @@ namespace UltraDES
     [Serializable]
     public class Empty : AbstractEvent
     {
-        static readonly Empty singleton = new Empty(); 
         private Empty()
         {
             Controllability = Controllability.Controllable;
         }
 
-        public static Empty EmptyEvent { get { return singleton; } }
+        public static Empty EmptyEvent { get; } = new Empty();
 
         public override bool Equals(object obj)
         {
@@ -19,7 +18,7 @@ namespace UltraDES
 
             // If parameter cannot be cast to Point return false.
             var p = obj as Empty;
-            if ((Object) p == null) return false;
+            if ((object) p == null) return false;
 
             // Return true if the fields match:
             return true;
@@ -27,7 +26,7 @@ namespace UltraDES
 
         public override int GetHashCode()
         {
-            return ("empty").GetHashCode();
+            return "empty".GetHashCode();
         }
 
         public override string ToString()
