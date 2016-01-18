@@ -1031,6 +1031,7 @@ namespace UltraDES
         /// <param name="nonBlocking">      true to non blocking. </param>
         /// <returns>   A DFA. </returns>
         ////////////////////////////////////////////////////////////////////////////////////////////////////
+        [Obsolete("MonoliticSupervisor is deprecated, please use MonolithicSupervisor instead. (Misspelling)")]
         public static DFA MonoliticSupervisor(IEnumerable<DFA> plants,
             IEnumerable<DFA> specifications, bool nonBlocking = false)
         {
@@ -1128,9 +1129,7 @@ namespace UltraDES
         /// <param name="allowed">      The allowed. </param>
         /// <returns>   true if it succeeds, false if it fails. </returns>
         ////////////////////////////////////////////////////////////////////////////////////////////////////
-        private static bool VerifyControlabillity(DFA result,
-            DFA plant,
-            IReadOnlyList<int> result2Plant, BitArray allowed)
+        private static bool VerifyControlabillity(DFA result, DFA plant, IReadOnlyList<int> result2Plant, BitArray allowed)
         {
             var change = false;
 
@@ -1160,25 +1159,6 @@ namespace UltraDES
             return change;
         }
 
-        //public static IEnumerable<DeterministicFiniteAutomaton> LocalModularSupervisor(
-        //    IEnumerable<DeterministicFiniteAutomaton> plants,
-        //    IEnumerable<DeterministicFiniteAutomaton> specifications)
-        //{
-        //    var dic =
-        //        specifications.ToDictionary(
-        //            e => { return plants.Where(p => p._events.Intersect(e._events).Any()).ToArray(); });
-
-        //    var supervisors =
-        //        dic.AsParallel()
-        //            .WithExecutionMode(ParallelExecutionMode.ForceParallelism)
-        //            .Select(automata => MonoliticSupervisor(automata.Key, new[] {automata.Value}))
-        //            .ToList();
-
-        //    if (IsConflicting(supervisors)) throw new Exception("conflicting supervisors");
-
-        //    return supervisors;
-        //}
-
         ////////////////////////////////////////////////////////////////////////////////////////////////////
         /// <summary>   Enumerates local modular supervisor in this collection. </summary>
         /// <remarks>   Lucas Alves, 05/01/2016. </remarks>
@@ -1191,21 +1171,17 @@ namespace UltraDES
         ///     collection.
         /// </returns>
         ////////////////////////////////////////////////////////////////////////////////////////////////////
-        public static IEnumerable<DFA> LocalModularSupervisor(
-            IEnumerable<DFA> plants,
-            IEnumerable<DFA> specifications,
-            IEnumerable<DFA> conflictResolvingSupervisor = null)
+        public static IEnumerable<DFA> LocalModularSupervisor(IEnumerable<DFA> plants, IEnumerable<DFA> specifications, IEnumerable<DFA> conflictResolvingSupervisor = null)
         {
             if (conflictResolvingSupervisor == null) conflictResolvingSupervisor = new DFA[0];
 
-            var dic =
-                specifications.ToDictionary(
-                    e => { return plants.Where(p => p._events.Intersect(e._events).Any()).ToArray(); });
+            var dic = specifications.ToDictionary(
+                e => { return plants.Where(p => p._events.Intersect(e._events).Any()).ToArray(); });
 
             var supervisors =
                 dic.AsParallel()
-                    .WithExecutionMode(ParallelExecutionMode.ForceParallelism)
-                    .Select(automata => MonoliticSupervisor(automata.Key, new[] {automata.Value}))
+                    //.WithExecutionMode(ParallelExecutionMode.ForceParallelism)
+                    .Select(automata => MonolithicSupervisor(automata.Key, new[] {automata.Value}))
                     .ToList();
 
             var complete = supervisors.Union(conflictResolvingSupervisor).ToList();
@@ -1231,28 +1207,22 @@ namespace UltraDES
         ///     collection.
         /// </returns>
         ////////////////////////////////////////////////////////////////////////////////////////////////////
-        public static IEnumerable<DFA> LocalModularSupervisor(
-            IEnumerable<DFA> plants,
-            IEnumerable<DFA> specifications,
-            out List<DFA> compoundPlants,
+        public static IEnumerable<DFA> LocalModularSupervisor(IEnumerable<DFA> plants, IEnumerable<DFA> specifications, out List<DFA> compoundPlants,
             IEnumerable<DFA> conflictResolvingSupervisor = null)
         {
             if (conflictResolvingSupervisor == null) conflictResolvingSupervisor = new DFA[0];
 
-            var dic =
-                specifications.ToDictionary(
+            var dic = specifications.ToDictionary(
                     e =>
                     {
-                        return
-                            plants.Where(p => p._events.Intersect(e._events).Any())
-                                .Aggregate((a, b) => a.ParallelCompositionWith(b))
+                        return plants.Where(p => p._events.Intersect(e._events).Any()).Aggregate((a, b) => a.ParallelCompositionWith(b))
                                 .CoaccessiblePart;
                     });
 
             var supervisors =
                 dic.AsParallel()
                     .WithExecutionMode(ParallelExecutionMode.ForceParallelism)
-                    .Select(automata => MonoliticSupervisor(new[] {automata.Key}, new[] {automata.Value}, true))
+                    .Select(automata => MonolithicSupervisor(new[] {automata.Key}, new[] {automata.Value}, true))
                     .ToList();
 
             var complete = supervisors.Union(conflictResolvingSupervisor).ToList();
@@ -1296,11 +1266,11 @@ namespace UltraDES
                 dic.AsParallel()
                     .AsOrdered()
                     .WithExecutionMode(ParallelExecutionMode.ForceParallelism)
-                    .Select(automata => MonoliticSupervisor(automata.Key, new[] {automata.Value}, true))
+                    .Select(automata => MonolithicSupervisor(automata.Key, new[] {automata.Value}, true))
                     .ToList();
 
             var ss = supervisors.ToList();
-            ss.AddRange(conflictResolvingSupervisor.Select(crs => MonoliticSupervisor(crs.Item1, crs.Item2, true)));
+            ss.AddRange(conflictResolvingSupervisor.Select(crs => MonolithicSupervisor(crs.Item1, crs.Item2, true)));
 
 
             if (IsConflicting(ss))
@@ -1529,7 +1499,7 @@ namespace UltraDES
         ///     An enumerator that allows foreach to be used to process power set in this collection.
         /// </returns>
         ////////////////////////////////////////////////////////////////////////////////////////////////////
-        public static IEnumerable<T[]> PowerSet<T>(T[] seq, int min, int max)
+        private static IEnumerable<T[]> PowerSet<T>(T[] seq, int min, int max)
         {
             for (var i = min; i <= max; i++)
             {
@@ -1547,7 +1517,7 @@ namespace UltraDES
         ///     An enumerator that allows foreach to be used to process combinations in this collection.
         /// </returns>
         ////////////////////////////////////////////////////////////////////////////////////////////////////
-        public static IEnumerable<int[]> Combinations(int m, int n)
+        private static IEnumerable<int[]> Combinations(int m, int n)
         {
             var result = new int[m];
             var stack = new Stack<int>();
@@ -1577,7 +1547,7 @@ namespace UltraDES
         /// <param name="supervisors">  The supervisors. </param>
         /// <returns>   true if conflicting, false if not. </returns>
         ////////////////////////////////////////////////////////////////////////////////////////////////////
-        private static bool IsConflicting(IEnumerable<DFA> supervisors)
+        public static bool IsConflicting(IEnumerable<DFA> supervisors)
         {
             var composition = supervisors.AsParallel().Aggregate((a, b) => a.ParallelCompositionWith(b));
 
